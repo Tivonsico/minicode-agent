@@ -1,0 +1,17 @@
+/others/plan/
+.env
+.env.*
+!.env.example
+.minicode/
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-*/
+.test-*/
+/others/test_record/
+.ruff_cache/
+*.egg-info/
+build/
+dist/

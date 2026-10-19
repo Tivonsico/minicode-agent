@@ -1,10 +1,10 @@
 import pytest
 
-from memory.permission_state import SessionPermissions
-from memory.session_store import SessionStore
+from backend.conversation.store import SessionStore
+from backend.permissions.directories import SessionPermissions
+from backend.tools.base import ToolError
+from backend.tools.executor import ToolExecutor
 from test.support.tooling import Outputs, call
-from tools.base import ToolError
-from tools.executor import ToolExecutor
 
 
 @pytest.mark.asyncio
@@ -87,9 +87,13 @@ async def test_project_is_not_a_work_directory_and_active_grant_survives_resume(
     executor = ToolExecutor(project, output, lambda _: True, session_permissions=permissions)
     assert permissions.roots() == ()
     assert (await executor.execute_batch([call("Glob", {"pattern": "*"})]))[0].error_type == "path"
-    assert (await executor.execute_batch([call("ReadFile", {"path": str(project / "private.txt")})]))[0].error_type == "path"
+    assert (
+        await executor.execute_batch([call("ReadFile", {"path": str(project / "private.txt")})])
+    )[0].error_type == "path"
     saved = output.save("log", "saved tool output")
-    assert (await executor.execute_batch([call("ReadFile", {"path": saved["path"]})]))[0].status == "succeeded"
+    assert (await executor.execute_batch([call("ReadFile", {"path": saved["path"]})]))[
+        0
+    ].status == "succeeded"
     with pytest.raises(ToolError):
         permissions.add(str(tmp_path))
     permissions.add(str(first))
@@ -103,6 +107,12 @@ async def test_project_is_not_a_work_directory_and_active_grant_survives_resume(
     restored = SessionPermissions(project, SessionStore(project, store.session_id))
     assert restored.active() == first
     resumed = ToolExecutor(project, output, lambda _: True, session_permissions=restored)
-    assert (await resumed.execute_batch([call("ReadFile", {"path": "note.txt"})]))[0].status == "succeeded"
-    assert (await resumed.execute_batch([call("ReadFile", {"path": str(project / "private.txt")})]))[0].error_type == "path"
-    assert (await resumed.execute_batch([call("ReadFile", {"path": str(prompt)})]))[0].status == "failed"
+    assert (await resumed.execute_batch([call("ReadFile", {"path": "note.txt"})]))[
+        0
+    ].status == "succeeded"
+    assert (
+        await resumed.execute_batch([call("ReadFile", {"path": str(project / "private.txt")})])
+    )[0].error_type == "path"
+    assert (await resumed.execute_batch([call("ReadFile", {"path": str(prompt)})]))[
+        0
+    ].status == "failed"

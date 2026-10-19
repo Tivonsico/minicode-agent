@@ -4,8 +4,8 @@ import json
 import httpx
 import pytest
 
-from config import Config
-from conversation.provider import Provider, ProviderError
+from backend.config import Config
+from backend.runtime.provider import Provider, ProviderError
 
 
 def chunk(delta=None, finish=None, **extra):
@@ -39,7 +39,9 @@ async def test_multitool_fragments_roles_usage_and_reasoning(tmp_path):
 
     def handler(request):
         body = json.loads(request.content)
-        assert body["model"] == "GLM-5.3-Flash"
+        assert body["model"] == "gpt-4.1"
+        assert body["max_completion_tokens"] == 1000
+        assert "max_tokens" not in body
         assert body["messages"] == messages
         assert "thinking" not in body and "temperature" not in body
         data = chunk({"reasoning_content": "reason"}) + chunk(
@@ -167,3 +169,24 @@ async def test_cancellation_closes_transport(tmp_path):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert closed.is_set()
+
+
+async def test_compatible_endpoint_preserves_model_and_uses_max_tokens(tmp_path):
+    def handler(request):
+        body = json.loads(request.content)
+        assert str(request.url) == "https://vendor.test/v1/chat/completions"
+        assert body["model"] == "arbitrary-model-id"
+        assert body["max_tokens"] == 1000
+        assert "max_completion_tokens" not in body
+        return httpx.Response(200, text=chunk({"content": "ok"}, "stop") + "data: [DONE]\n\n")
+
+    cfg = Config(
+        tmp_path,
+        "private-key",
+        base_url="https://vendor.test/v1/",
+        model="arbitrary-model-id",
+        context_window=10000,
+        max_output_tokens=1000,
+    )
+    result = await Provider(cfg, transport=httpx.MockTransport(handler)).complete([], [], noop)
+    assert result.content == "ok"

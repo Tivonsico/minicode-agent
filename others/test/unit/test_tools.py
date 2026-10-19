@@ -7,8 +7,8 @@ import time
 
 import pytest
 
+from backend.tools.base import ToolError
 from test.support.tooling import call
-from tools.base import ToolError
 
 
 @pytest.mark.asyncio
@@ -265,16 +265,18 @@ async def test_glob_star_stays_at_one_level_and_lists_directories(tmp_path, setu
     assert set(top[0].content.splitlines()) == {"top.txt", "folder/"}
     child = await executor.execute_batch([call("Glob", {"pattern": "*/*"}, "child")])
     assert set(child[0].content.splitlines()) == {"folder/child.txt", "folder/deep/"}
-    recursive = await executor.execute_batch(
-        [call("Glob", {"pattern": "**/*.txt"}, "recursive")]
-    )
+    recursive = await executor.execute_batch([call("Glob", {"pattern": "**/*.txt"}, "recursive")])
     assert set(recursive[0].content.splitlines()) == {
-        "top.txt", "folder/child.txt", "folder/deep/grandchild.txt"
+        "top.txt",
+        "folder/child.txt",
+        "folder/deep/grandchild.txt",
     }
 
 
 @pytest.mark.asyncio
-async def test_slow_search_does_not_block_ui_and_cancels_promptly(tmp_path, setup_tools, monkeypatch):
+async def test_slow_search_does_not_block_ui_and_cancels_promptly(
+    tmp_path, setup_tools, monkeypatch
+):
     executor, *_ = setup_tools
     original = executor.policy.files
 
@@ -283,9 +285,7 @@ async def test_slow_search_does_not_block_ui_and_cancels_promptly(tmp_path, setu
         yield from original(**kwargs)
 
     monkeypatch.setattr(executor.policy, "files", slow_files)
-    task = asyncio.create_task(
-        executor.execute_batch([call("Glob", {"pattern": "*"}, "slow")])
-    )
+    task = asyncio.create_task(executor.execute_batch([call("Glob", {"pattern": "*"}, "slow")]))
     await asyncio.sleep(0.02)
     assert not task.done()
     started = asyncio.get_running_loop().time()

@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="minicode-token" content="__MINICODE_TOKEN__" />
+    <title>minicode</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/inspection/styles.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="app-name">minicode</span
+        ><button
+          id="sidebar-close"
+          class="icon-only"
+          aria-label="收起会话列表"
+          data-icon="panel-left"
+        ></button>
+      </div>
+      <button id="new-session" class="new-session">
+        <span data-icon="plus"></span>新会话
+      </button>
+      <button id="evaluation-open" class="new-session">
+        <span data-icon="file"></span>评测
+      </button>
+      <div class="nav-label">最近会话</div>
+      <nav id="sessions" aria-label="会话列表"></nav>
+      <div class="sidebar-bottom">
+        <span class="connection-dot"></span><span>本地运行</span>
+      </div>
+    </aside>
+    <main id="chat-view" data-empty="true">
+      <header>
+        <button
+          id="sidebar-toggle"
+          class="icon-only"
+          aria-label="展开会话列表"
+          data-icon="panel-left"
+        ></button>
+        <h1 id="session-title">新会话</h1>
+        <span id="run-status" class="badge">就绪</span>
+        <button
+          id="inspect-toggle"
+          class="icon-only workspace-toggle"
+          aria-label="展开或收起工作区"
+          aria-expanded="false"
+        >
+          <span data-icon="panel-right"></span>
+        </button>
+      </header>
+      <div id="notice" role="status" hidden></div>
+      <div class="conversation-stage">
+        <div class="conversation-heading">
+          <h2 id="conversation-title">新会话</h2>
+          <p id="conversation-subtitle">选择一个项目，然后开始编程。</p>
+        </div>
+        <section
+          id="messages"
+          aria-live="polite"
+          aria-label="对话消息"
+        ></section>
+        <section id="approval-panel" hidden aria-label="待审批操作">
+          <div class="approval-heading">
+            <span>确认操作</span><strong id="approval-name"></strong>
+          </div>
+          <pre id="approval-description"></pre>
+          <details>
+            <summary>查看完整命令或文件差异</summary>
+            <pre id="approval-details"></pre>
+          </details>
+          <div class="approval-actions">
+            <button id="reject">拒绝并暂停</button
+            ><button id="approve" class="primary">批准本次操作</button>
+          </div>
+        </section>
+        <footer>
+          <form id="composer">
+            <textarea
+              id="input"
+              rows="3"
+              placeholder="描述任务，或粘贴一段代码…"
+              aria-label="任务内容"
+            ></textarea>
+            <div class="composer-mode">
+              <select id="agent-mode" aria-label="执行模式" title="执行模式">
+                <option value="manual">Manual · 手动确认</option>
+                <option value="accept_edit">Accept Edit · 自动编辑</option>
+                <option value="plan">Plan · 只读规划</option>
+                <option value="auto">Auto · 沙箱自动执行</option>
+              </select>
+              <button id="mode-details" type="button" class="text-button">
+                权限与指令
+              </button>
+              <span class="persistence-modes" aria-label="存储并发模式说明">
+                <button type="button" id="local-mode-help" class="text-button" aria-haspopup="dialog">低并发模式：本地</button>
+                <span aria-hidden="true">/</span>
+                <button type="button" id="mysql-mode-help" class="text-button" aria-haspopup="dialog">高并发模式：MySQL</button>
+              </span>
+            </div>
+            <div class="composer-bottom">
+              <button
+                id="composer-directory"
+                type="button"
+                class="composer-action"
+              >
+                <span data-icon="folder"></span
+                ><span id="project-label">选择工作目录</span>
+              </button>
+              <span id="model" class="model-label">连接中</span>
+              <select
+                id="reasoning-effort"
+                aria-label="思考强度"
+                title="思考强度"
+                hidden
+              ></select>
+              <div class="composer-spacer"></div>
+              <button
+                id="cancel"
+                type="button"
+                class="icon-only stop-button"
+                aria-label="停止任务"
+                title="停止任务"
+                hidden
+                data-icon="stop"
+              ></button>
+              <button
+                id="send"
+                class="send-button"
+                type="submit"
+                aria-label="发送任务"
+                title="发送任务"
+              >
+                <span data-icon="arrow-up"></span>
+              </button>
+            </div>
+          </form>
+          <div class="composer-caption">
+            <span id="input-hint">Enter 发送，Shift + Enter 换行</span
+            ><span>任务在本机执行</span>
+          </div>
+        </footer>
+      </div>
+    </main>
+    <aside class="inspector" id="inspector" aria-label="工作区详情" hidden>
+      <div class="inspector-title">
+        <span>工作区</span
+        ><button
+          id="inspect-close"
+          class="icon-only"
+          aria-label="收起工作区"
+          data-icon="panel-right"
+        ></button>
+      </div>
+      <section>
+        <div class="section-title">
+          工作目录<button id="add-directory" class="text-button">添加</button>
+        </div>
+        <div id="directories" class="empty">尚未选择目录</div>
+      </section>
+      <section>
+        <div class="section-title">当前任务</div>
+        <div id="task-state" class="empty">等待任务</div>
+      </section>
+      <section>
+        <div class="section-title">上下文预算</div>
+        <progress id="context-progress" value="0" max="100"></progress>
+        <div class="metrics">
+          <span id="context-size">0 / —</span><span>估算</span>
+        </div>
+      </section>
+      <section>
+        <div class="section-title">
+          项目记忆<button id="refresh-memory" class="text-button">刷新</button>
+        </div>
+        <div id="memory" class="empty">暂无记忆</div>
+      </section>
+      <section>
+        <div class="section-title">指令与技能</div>
+        <button id="edit-prompts" class="wide-button">
+          <span data-icon="file"></span>编辑提示词</button
+        ><button id="select-skill" class="wide-button">
+          <span data-icon="sparkles"></span>管理技能
+        </button>
+      </section>
+      <section>
+        <div class="section-title">运行与记忆</div>
+        <button id="inspection-open" class="wide-button">
+          <span data-icon="file"></span>查看运行记录
+        </button>
+      </section>
+      <section>
+        <div class="section-title">执行环境</div>
+        <p id="sandbox" class="subtle">检查沙箱中…</p>
+      </section>
+    </aside>
+    <section id="evaluation-view" aria-label="评测界面" hidden>
+      <div class="page-heading">
+        <div>
+          <h2>Agent 评测</h2>
+          <p class="subtle">
+            选择评测框架和任务集，运行固定任务或检查已有会话。
+          </p>
+        </div>
+        <button id="evaluation-back">返回会话</button>
+      </div>
+      <p id="evaluation-error" class="error" role="alert"></p>
+      <p id="evaluation-status" class="subtle" role="status"></p>
+      <div class="evaluation-layout">
+        <aside class="evaluation-library">
+          <div class="section-title">
+            任务库 <span id="dataset-revision"></span>
+          </div>
+          <div class="evaluation-selectors">
+            <label class="field-label" for="evaluation-framework"
+              >评测框架</label
+            >
+            <select id="evaluation-framework"></select>
+            <label class="field-label" for="evaluation-dataset">评测集</label>
+            <select id="evaluation-dataset"></select>
+            <label class="field-label" for="case-filter">任务分类</label>
+            <select id="case-filter"></select>
+          </div>
+          <p id="evaluation-scope" class="subtle" role="status"></p>
+          <div id="local-library">
+            <div class="evaluation-actions">
+              <button id="case-select-all" class="text-button">
+                选中当前分类</button
+              ><button id="case-select-none" class="text-button">
+                清空选择
+              </button>
+              <button id="session-import-open" class="text-button">
+                导入会话
+              </button>
+            </div>
+            <nav id="evaluation-cases" aria-label="评测项"></nav>
+            <div class="evaluation-actions">
+              <button id="case-add">新增任务</button
+              ><button id="dataset-save">保存评测集</button>
+            </div>
+            <div class="section-title evaluation-report-title">
+              本地运行与报告
+            </div>
+            <div id="evaluation-reports"></div>
+          </div>
+          <div id="swe-library" hidden>
+            <button id="swe-clear" class="text-button">清空选择</button>
+            <nav id="swe-cases" aria-label="官方评测任务"></nav>
+            <div class="section-title evaluation-report-title">
+              官方运行与报告
+            </div>
+            <div id="swe-reports"></div>
+          </div>
+        </aside>
+        <div class="evaluation-workbench">
+          <section id="swe-bench-setup" hidden>
+            <div class="section-title">
+              官方任务评测 <span id="swe-count"></span>
+            </div>
+            <h3 id="swe-dataset-name"></h3>
+            <p id="swe-dataset-description" class="subtle"></p>
+            <p id="swe-state" class="subtle" role="status"></p>
+            <div class="inline-actions">
+              <button id="swe-sync">同步官方任务</button>
+              <a id="swe-dataset-link" target="_blank" rel="noopener noreferrer"
+                >查看官方评测集</a
+              >
+              <a
+                href="https://www.swebench.com/SWE-bench/guides/evaluation/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >官方验收说明</a
+              >
+            </div>
+            <p class="subtle">
+              选择少量真实仓库 Issue，Minicode 修复后生成补丁，由官方 Docker
+              验收。会调用当前模型并产生用量；首次构建环境可能需要较长时间。
+            </p>
+            <div class="benchmark-fields">
+              <label>模型<span id="swe-model"></span></label>
+              <label>思考强度<select id="swe-effort"></select></label>
+              <label
+                >执行模式<select id="swe-mode">
+                  <option value="auto">Auto · 沙箱自动执行</option>
+                  <option value="accept_edit">Accept Edit · 自动编辑</option>
+                  <option value="manual">Manual · 手动确认</option>
+                </select></label
+              >
+              <label
+                >评测审批<select id="swe-approval">
+                  <option value="approve">模拟批准工作区操作</option>
+                  <option value="reject">模拟拒绝需审批操作</option>
+                </select></label
+              >
+              <label
+                >Agent 时间上限（秒）<input
+                  id="swe-agent-timeout"
+                  type="number"
+                  min="30"
+                  max="3600"
+                  value="600"
+              /></label>
+              <label
+                >官方测试时间上限（秒）<input
+                  id="swe-grader-timeout"
+                  type="number"
+                  min="30"
+                  max="3600"
+                  value="1800"
+              /></label>
+            </div>
+            <div class="inline-actions">
+              <button id="swe-run" class="primary" disabled>
+                运行所选官方任务</button
+              ><button id="swe-cancel" hidden>停止运行</button>
+            </div>
+            <div id="swe-task-detail"></div>
+            <section id="swe-report" aria-label="官方评测报告"></section>
+          </section>
+          <section
+            id="history-controls"
+            class="benchmark-controls"
+            aria-label="会话检查设置"
+            hidden
+          >
+            <div class="section-title">
+              检查所选规则 <span id="history-count"></span>
+            </div>
+            <p class="subtle">
+              导入的规则检查来源会话；通用规则检查已有会话。只读取已保存的记录，不调用模型或执行工具。
+            </p>
+            <button id="evaluation-run" class="primary">检查所选规则</button>
+          </section>
+          <p id="evaluation-empty" class="subtle" hidden>
+            当前分类没有评测项。可以新增任务，或导入自己的会话。
+          </p>
+          <section
+            id="benchmark-controls"
+            class="benchmark-controls"
+            aria-label="运行设置"
+          >
+            <div class="section-title">
+              运行所选任务 <span id="benchmark-count"></span>
+            </div>
+            <p class="subtle">
+              将调用当前模型并产生用量。每个模式使用独立的临时工作区；审批由下方脚本模拟用户处理，固定安全边界始终生效。
+            </p>
+            <div class="benchmark-options">
+              <div>
+                <span class="field-label">模型</span
+                ><span id="benchmark-model"></span>
+              </div>
+              <div>
+                <label class="field-label" for="benchmark-effort"
+                  >思考强度</label
+                ><select
+                  id="benchmark-effort"
+                  aria-label="评测思考强度"
+                ></select>
+              </div>
+              <div>
+                <label class="field-label" for="benchmark-repeats"
+                  >每题重复次数</label
+                ><input
+                  id="benchmark-repeats"
+                  type="number"
+                  value="1"
+                  min="1"
+                  max="5"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="benchmark-timeout"
+                  >每次时间上限（秒）</label
+                ><input
+                  id="benchmark-timeout"
+                  type="number"
+                  value="180"
+                  min="15"
+                  max="900"
+                />
+              </div>
+            </div>
+            <fieldset class="benchmark-mode-options">
+              <legend>执行模式</legend>
+              <label><input type="checkbox" value="manual" /> Manual</label>
+              <label
+                ><input type="checkbox" value="accept_edit" /> Accept
+                Edit</label
+              >
+              <label><input type="checkbox" value="plan" /> Plan</label>
+              <label><input type="checkbox" value="auto" checked /> Auto</label>
+            </fieldset>
+            <label class="field-label" for="benchmark-approval"
+              >模拟审批行为</label
+            >
+            <select id="benchmark-approval">
+              <option value="approve">批准临时工作区内的请求</option>
+              <option value="reject">拒绝需要审批的请求</option>
+            </select>
+            <p class="subtle">
+              实现任务对应 Manual / Accept Edit / Auto；Plan
+              对应独立的规划任务。报告分别统计，不能用只读规划成绩替代编码成功率。
+            </p>
+            <div class="evaluation-actions">
+              <button id="benchmark-run" class="primary">运行所选任务</button
+              ><button id="benchmark-cancel" hidden>停止评测</button>
+            </div>
+            <p id="benchmark-progress" class="subtle" role="status"></p>
+          </section>
+          <form id="case-form">
+            <div class="section-title">
+              任务详情<button
+                id="case-remove"
+                type="button"
+                class="text-button"
+              >
+                移除此项
+              </button>
+            </div>
+            <label class="field-label" for="case-name">名称</label
+            ><input id="case-name" maxlength="120" required />
+            <div class="form-columns">
+              <div>
+                <label class="field-label" for="case-mode">评测方式</label
+                ><select id="case-mode">
+                  <option value="task">重新运行并独立验收</option>
+                  <option value="history">检查已有会话记录</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" for="case-category">任务分类</label
+                ><select id="case-category">
+                  <option value="repair">问题修复</option>
+                  <option value="feature">功能实现</option>
+                  <option value="multiturn">多轮需求</option>
+                  <option value="security">安全场景</option>
+                  <option value="history">会话规则</option>
+                </select>
+              </div>
+            </div>
+            <p id="case-source" class="subtle"></p>
+            <div id="task-fields">
+              <label class="field-label" for="case-goal">验收目标</label>
+              <select id="case-goal">
+                <option value="implementation">实现代码</option>
+                <option value="planning">只读规划（Plan）</option>
+              </select>
+              <div id="planning-fields" hidden>
+                <label class="field-label" for="case-plan-output"
+                  >计划应包含（每行一个条件）</label
+                >
+                <textarea id="case-plan-output" rows="3"></textarea>
+                <p class="subtle">
+                  额外检查工作区保持原样、不尝试写入或命令。关键词只检查计划内容覆盖，不衡量整体计划质量；文件验收请选择文本或不存在条件。
+                </p>
+              </div>
+              <label class="field-label" for="case-prompts"
+                >用户需求（多轮需求之间用独立一行 --- 分隔）</label
+              ><textarea id="case-prompts" rows="5"></textarea>
+              <div class="section-title">
+                初始文件<button id="file-add" type="button" class="text-button">
+                  添加文件
+                </button>
+              </div>
+              <div id="case-files"></div>
+              <div class="section-title">
+                独立验收条件<button
+                  id="assertion-add"
+                  type="button"
+                  class="text-button"
+                >
+                  添加条件
+                </button>
+              </div>
+              <p class="subtle">
+                验收条件不会加入模型上下文。函数输入和预期结果使用
+                JSON；异常填写 ValueError 等异常名称。
+              </p>
+              <div id="case-assertions"></div>
+              <label class="field-label" for="case-protected"
+                >必须保持原样的文件（每行一个路径）</label
+              ><textarea id="case-protected" rows="2"></textarea>
+            </div>
+            <div id="history-fields" hidden>
+              <label class="field-label" for="case-agent-mode"
+                >来源模式筛选</label
+              >
+              <select id="case-agent-mode">
+                <option value="">所有模式（包括未标记历史）</option>
+                <option value="manual">Manual</option>
+                <option value="accept_edit">Accept Edit</option>
+                <option value="plan">Plan</option>
+                <option value="auto">Auto</option>
+              </select>
+              <label class="field-label" for="case-input">匹配用户输入</label
+              ><textarea
+                id="case-input"
+                rows="2"
+                placeholder="每行一个条件，全部匹配才检查"
+              ></textarea>
+              <label class="field-label" for="case-output">最终回复应包含</label
+              ><textarea id="case-output" rows="2"></textarea>
+              <div class="form-columns">
+                <div>
+                  <label class="field-label" for="case-tools"
+                    >应成功执行的工具</label
+                  ><textarea id="case-tools" rows="2"></textarea>
+                </div>
+                <div>
+                  <label class="field-label" for="case-forbidden"
+                    >不应调用的工具</label
+                  ><textarea id="case-forbidden" rows="2"></textarea>
+                </div>
+              </div>
+              <label class="field-label" for="case-status">预期执行状态</label
+              ><select id="case-status">
+                <option value="">不限制</option>
+                <option value="completed">已完成</option>
+                <option value="failed">失败</option>
+                <option value="paused">暂停</option>
+                <option value="interrupted">中断</option>
+              </select>
+              <label class="session-check"
+                ><input id="case-verification" type="checkbox" /><span
+                  >要求存在通过的实际验证记录</span
+                ></label
+              >
+            </div>
+            <div class="dialog-actions">
+              <button class="primary">保存评测集</button>
+            </div>
+          </form>
+          <section id="evaluation-report" hidden>
+            <div class="section-title">
+              <span id="report-heading"></span>
+              <div class="inline-actions">
+                <button id="report-regrade" class="text-button" hidden>
+                  重新验收保存产物</button
+                ><button id="report-export" class="text-button">
+                  导出报告
+                </button>
+              </div>
+            </div>
+            <p id="report-description" class="subtle"></p>
+            <div id="report-metrics" class="report-metrics"></div>
+            <div id="report-results"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+    <dialog id="evaluation-import-dialog">
+      <h2>导入会话</h2>
+      <p class="subtle">
+        保留用户需求、来源会话和日志范围，加入「会话检查规则」。补齐初始文件与验收条件后，也可以转为编程任务。
+      </p>
+      <div id="evaluation-sessions"></div>
+      <p id="evaluation-import-error" class="error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="button" data-close>取消</button>
+        <button id="session-import" class="primary">导入所选会话</button>
+      </div>
+    </dialog>
+    <dialog id="inspection-dialog">
+      <div class="page-heading">
+        <div>
+          <h2>运行记录</h2>
+          <p class="subtle">查看执行证据、摘要历史和当前任务状态。</p>
+        </div>
+        <div class="evaluation-actions">
+          <button id="inspection-refresh">刷新</button
+          ><button id="trace-export">导出轨迹</button
+          ><button data-close>关闭</button>
+        </div>
+      </div>
+      <div class="inspection-tabs" role="tablist" aria-label="运行记录分类">
+        <button
+          role="tab"
+          id="inspection-tab-timeline"
+          aria-controls="inspection-pane-timeline"
+          data-inspection-tab="timeline"
+        >
+          时间线</button
+        ><button
+          role="tab"
+          id="inspection-tab-logs"
+          aria-controls="inspection-pane-logs"
+          data-inspection-tab="logs"
+        >
+          日志</button
+        ><button
+          role="tab"
+          id="inspection-tab-summaries"
+          aria-controls="inspection-pane-summaries"
+          data-inspection-tab="summaries"
+        >
+          摘要历史</button
+        ><button
+          role="tab"
+          id="inspection-tab-checkpoints"
+          aria-controls="inspection-pane-checkpoints"
+          data-inspection-tab="checkpoints"
+        >
+          检查点</button
+        ><button
+          role="tab"
+          id="inspection-tab-state"
+          aria-controls="inspection-pane-state"
+          data-inspection-tab="state"
+        >
+          检查点状态</button
+        ><button
+          role="tab"
+          id="inspection-tab-memory"
+          aria-controls="inspection-pane-memory"
+          data-inspection-tab="memory"
+        >
+          长期记忆
+        </button>
+      </div>
+      <p id="inspection-error" class="error" role="alert"></p>
+      <p id="inspection-status" class="subtle" role="status"></p>
+      <section
+        id="inspection-pane-timeline"
+        role="tabpanel"
+        aria-labelledby="inspection-tab-timeline"
+        data-inspection-pane="timeline"
+      >
+        <p id="trace-metrics" class="subtle"></p>
+        <div id="timeline-records"></div>
+      </section>
+      <section
+        id="inspection-pane-logs"
+        role="tabpanel"
+        aria-labelledby="inspection-tab-logs"
+        data-inspection-pane="logs"
+        hidden
+      >
+        <label class="field-label" for="log-kind">事件类型</label
+        ><select id="log-kind">
+          <option value="">全部事件</option>
+          <option>request_start</option>
+          <option>request_end</option>
+          <option>tool_result</option>
+          <option>approval_requested</option>
+          <option>verification_result</option>
+          <option>task_state</option>
+          <option>checkpoint</option>
+          <option>assistant_delta</option>
+        </select>
+        <div id="log-records"></div>
+        <button id="log-more">加载更多</button>
+      </section>
+      <section
+        id="inspection-pane-summaries"
+        role="tabpanel"
+        aria-labelledby="inspection-tab-summaries"
+        data-inspection-pane="summaries"
+        hidden
+      >
+        <p class="subtle">每次压缩保存一份摘要及覆盖范围，可以按时间查看。</p>
+        <div id="summary-records"></div>
+      </section>
+      <section
+        id="inspection-pane-checkpoints"
+        role="tabpanel"
+        aria-labelledby="inspection-tab-checkpoints"
+        data-inspection-pane="checkpoints"
+        hidden
+      >
+        <div class="page-heading">
+          <p class="subtle">
+            同步会立即保存当前检查点状态。执行中的任务保持
+            running；不会回退文件或重新执行工具。
+          </p>
+          <button id="checkpoint-sync">同步当前状态</button>
+        </div>
+        <p class="subtle" id="checkpoint-recovery"></p>
+        <div id="unresolved-operations"></div>
+        <div id="checkpoint-records"></div>
+      </section>
+      <section
+        id="inspection-pane-state"
+        role="tabpanel"
+        aria-labelledby="inspection-tab-state"
+        data-inspection-pane="state"
+        hidden
+      >
+        <form id="state-form">
+          <label class="field-label" for="state-objective">当前目标</label
+          ><textarea
+            id="state-objective"
+            rows="3"
+            maxlength="100000"
+          ></textarea>
+          <div class="form-columns">
+            <div>
+              <label class="field-label" for="state-next">下一步</label
+              ><textarea id="state-next" rows="3" maxlength="10000"></textarea>
+            </div>
+            <div>
+              <label class="field-label" for="state-notes">备注</label
+              ><textarea id="state-notes" rows="3" maxlength="10000"></textarea>
+            </div>
+          </div>
+          <label class="field-label" for="state-status">任务标记</label
+          ><select id="state-status">
+            <option value="idle">就绪</option>
+            <option value="running">执行中</option>
+            <option value="completed">已结束</option>
+            <option value="paused">已暂停</option>
+            <option value="interrupted">已中断</option>
+            <option value="failed">失败</option>
+          </select>
+          <p class="subtle">
+            手动更新保留来源记录。修改目标和备注不改写已提交的用户消息；执行事实与验证结果不能通过任务标记覆盖。
+          </p>
+          <details class="record-item">
+            <summary>查看系统维护的状态</summary>
+            <pre id="state-evidence"></pre>
+          </details>
+          <div class="dialog-actions">
+            <button class="primary">更新检查点状态</button>
+          </div>
+        </form>
+      </section>
+      <section
+        id="inspection-pane-memory"
+        role="tabpanel"
+        aria-labelledby="inspection-tab-memory"
+        data-inspection-pane="memory"
+        hidden
+      >
+        <label class="field-label" for="memory-scope-filter">查看范围</label
+        ><select id="memory-scope-filter">
+          <option value="current">当前项目</option>
+          <option value="all">全部项目</option>
+        </select>
+        <div id="long-memory-records"></div>
+        <form id="memory-add-form">
+          <label class="field-label" for="memory-new-content"
+            >添加长期记忆</label
+          ><textarea
+            id="memory-new-content"
+            rows="3"
+            maxlength="10000"
+            required
+          ></textarea>
+          <p id="memory-current-scope" class="subtle"></p>
+          <div class="dialog-actions"><button>添加到当前项目</button></div>
+        </form>
+      </section>
+    </dialog>
+    <dialog id="directory-dialog">
+      <form id="directory-form">
+        <h2>选择工作目录</h2>
+        <p>打开项目文件夹，然后点击选择。授权仅对当前会话生效。</p>
+        <div class="folder-browser">
+          <nav id="directory-shortcuts" aria-label="常用位置"></nav>
+          <div class="folder-content">
+            <nav id="directory-breadcrumbs" aria-label="当前位置"></nav>
+            <input
+              id="directory-filter"
+              type="search"
+              placeholder="筛选当前文件夹"
+              aria-label="筛选文件夹名称"
+            />
+            <div
+              id="directory-list"
+              class="folder-list"
+              aria-live="polite"
+            ></div>
+          </div>
+        </div>
+        <div id="directory-selection" class="selection-summary"></div>
+        <p id="directory-error" class="error"></p>
+        <div class="dialog-actions">
+          <button type="button" data-close>取消</button
+          ><button id="directory-confirm" class="primary" disabled>
+            选择此文件夹
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="mode-dialog">
+      <h2>执行模式</h2>
+      <select id="mode-view" aria-label="查看模式"></select>
+      <h3>固定权限</h3>
+      <div id="mode-policy"></div>
+      <details>
+        <summary>所有模式的安全边界</summary>
+        <ul id="mode-boundaries"></ul>
+      </details>
+      <details>
+        <summary>固定模式指令</summary>
+        <pre id="mode-fixed"></pre>
+      </details>
+      <details>
+        <summary>固定运行时指令（所有模式共享）</summary>
+        <pre id="mode-shared"></pre>
+      </details>
+      <label class="field-label" for="mode-note"
+        >补充指令（可编辑，不能改变权限）</label
+      >
+      <textarea
+        id="mode-note"
+        rows="5"
+        maxlength="4000"
+        placeholder="例如：优先给出简洁的计划；编辑后说明改动原因。"
+      ></textarea>
+      <p class="subtle">
+        补充指令由所有会话共享，下轮生效。项目记忆保留来源模式，但不能扩大权限。
+      </p>
+      <div id="mode-versions"></div>
+      <p id="mode-feedback" role="status"></p>
+      <div class="dialog-actions">
+        <button data-close>关闭</button
+        ><button id="mode-save" class="primary">保存补充指令</button>
+      </div>
+    </dialog>
+    <dialog id="prompt-dialog">
+      <h2>编辑提示词</h2>
+      <select id="prompt-select" aria-label="提示词范围"></select
+      ><textarea
+        id="prompt-content"
+        rows="16"
+        aria-label="提示词内容"
+      ></textarea>
+      <p id="prompt-error" class="error"></p>
+      <div class="dialog-actions">
+        <button data-close>取消</button
+        ><button id="save-prompt" class="primary">保存</button>
+      </div>
+    </dialog>
+    <dialog id="skill-dialog">
+      <h2>技能</h2>
+      <p>创建自己的技能，或从社区下载。选择的技能用于下一轮任务。</p>
+      <div class="skill-layout">
+        <aside class="skill-installed">
+          <div class="section-title">
+            已安装 <span id="skill-count">0</span>
+          </div>
+          <div id="skill-list"></div>
+        </aside>
+        <div class="skill-workbench">
+          <div class="skill-tabs" role="tablist" aria-label="技能管理方式">
+            <button
+              type="button"
+              role="tab"
+              id="skill-tab-create"
+              aria-selected="true"
+              aria-controls="skill-pane-create"
+              data-skill-tab="create"
+            >
+              创建技能
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="skill-tab-repository"
+              aria-selected="false"
+              aria-controls="skill-pane-repository"
+              data-skill-tab="repository"
+            >
+              仓库下载
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="skill-tab-search"
+              aria-selected="false"
+              aria-controls="skill-pane-search"
+              data-skill-tab="search"
+            >
+              搜索下载
+            </button>
+          </div>
+          <label class="field-label" for="skill-scope">保存到</label>
+          <select id="skill-scope" aria-label="技能保存位置"></select>
+          <section
+            id="skill-pane-create"
+            role="tabpanel"
+            aria-labelledby="skill-tab-create"
+          >
+            <form id="skill-create-form">
+              <label class="field-label" for="skill-name">技能名称</label>
+              <input
+                id="skill-name"
+                placeholder="例如 code-review"
+                maxlength="64"
+                required
+              />
+              <div id="skill-description-field">
+                <label class="field-label" for="skill-description">用途</label>
+                <input
+                  id="skill-description"
+                  placeholder="什么时候使用这个技能"
+                  maxlength="500"
+                  required
+                />
+              </div>
+              <label class="field-label" for="skill-content">技能指令</label>
+              <textarea
+                id="skill-content"
+                rows="9"
+                placeholder="描述执行步骤、检查重点和输出要求…"
+                required
+              ></textarea>
+              <div class="dialog-actions">
+                <button id="skill-new" type="button" hidden>新建另一个</button
+                ><button id="skill-save" class="primary">保存技能</button>
+              </div>
+            </form>
+          </section>
+          <section
+            id="skill-pane-repository"
+            role="tabpanel"
+            aria-labelledby="skill-tab-repository"
+            hidden
+          >
+            <form id="skill-repository-form">
+              <label class="field-label" for="skill-url"
+                >GitHub 仓库或技能文件夹链接</label
+              >
+              <input
+                id="skill-url"
+                type="url"
+                placeholder="https://github.com/anthropics/skills"
+                required
+              />
+              <div class="dialog-actions">
+                <button id="skill-inspect" class="primary">查看仓库技能</button>
+              </div>
+            </form>
+            <div
+              id="skill-repository-results"
+              class="skill-results"
+              aria-live="polite"
+            ></div>
+          </section>
+          <section
+            id="skill-pane-search"
+            role="tabpanel"
+            aria-labelledby="skill-tab-search"
+            hidden
+          >
+            <form id="skill-search-form" class="search-form">
+              <input
+                id="skill-query"
+                type="search"
+                placeholder="输入技能名称或关键词"
+                minlength="2"
+                maxlength="100"
+                aria-label="搜索技能"
+                required
+              />
+              <button id="skill-search-button" class="primary">搜索</button>
+            </form>
+            <p id="skill-search-note" class="subtle">
+              搜索 Skills.sh 社区技能。
+            </p>
+            <div
+              id="skill-search-results"
+              class="skill-results"
+              aria-live="polite"
+            ></div>
+          </section>
+        </div>
+      </div>
+      <p id="skill-error" class="error"></p>
+      <p id="skill-status" role="status"></p>
+      <div class="dialog-actions"><button data-close>关闭</button></div>
+    </dialog>
+    <dialog id="persistence-dialog" aria-labelledby="persistence-title">
+      <h2 id="persistence-title">存储与恢复</h2>
+      <div id="persistence-description"></div>
+      <div class="dialog-actions"><button id="persistence-close" type="button">关闭</button></div>
+    </dialog>
+  </body>
+</html>

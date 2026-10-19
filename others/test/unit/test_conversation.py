@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from conversation.manager import ConversationManager
-from conversation.projection import project_messages
-from conversation.resume import recover_session
-from memory.session_store import SessionStore
+from backend.conversation.manager import ConversationManager
+from backend.conversation.projection import project_messages
+from backend.conversation.resume import recover_session
+from backend.conversation.store import SessionStore
 
 
 def call(id):

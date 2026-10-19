@@ -1,188 +1,230 @@
+"""Real installed Codex sandbox, no LLM and no unsafe host-shell fallback."""
+
 import asyncio
-import shutil
+import os
+import sys
+from types import SimpleNamespace
 
 import pytest
 
+from backend.context.prompts import assemble_system_prompt
+from backend.conversation.store import SessionStore
+from backend.execution.codex import CodexSandbox
+from backend.permissions.directories import SessionPermissions
+from backend.storage.output_store import OutputStore
+from backend.tools.executor import ToolExecutor
 from test.support.tooling import call
-from tools import shell
-
-pytestmark = pytest.mark.skip(reason="Shell execution requires a verified Windows sandbox")
 
 
-@pytest.mark.asyncio
-async def test_shell_output_exit_code_and_approval(tmp_path, setup_tools):
-    executor, output, approvals, events = setup_tools
-    results = await executor.execute_batch(
-        [
-            call(
-                "Shell",
-                {"command": "Write-Output 'hello'; [Console]::Error.WriteLine('problem'); exit 7"},
-            )
-        ]
-    )
-    assert results[0].status == "failed"
-    assert results[0].error_type == "exit_code"
-    assert "hello" in results[0].content and "problem" in results[0].content
-    assert str(tmp_path) in approvals[0]["description"]
-    assert "120" in approvals[0]["description"]
-    assert len(output.records) == 2
-    assert any(kind == "shell_result" and value["exit_code"] == 7 for kind, value in events)
+async def verified(tmp_path):
+    application = tmp_path / "app"
+    work = tmp_path / "work"
+    application.mkdir()
+    work.mkdir()
+    backend = CodexSandbox(application, lambda: (work,))
+    if not await backend.verify():
+        pytest.skip(backend.reason)
+    return backend, work, OutputStore(SessionStore(application))
 
 
-@pytest.mark.asyncio
-async def test_shell_timeout_stops_before_side_effect(tmp_path, setup_tools):
-    executor, _, approvals, _ = setup_tools
+@pytest.mark.skipif(os.name == "nt", reason="POSIX command fixture")
+@pytest.mark.parametrize("changed", [False, True])
+async def test_shell_preserves_unchanged_read_but_changed_file_still_rejects_edit(
+    tmp_path, changed
+):
+    backend, work, output = await verified(tmp_path)
+    grants = SessionPermissions(backend.application_root, output.store)
+    grants.add(str(work))
+
+    async def approve(_request):
+        return True
+
+    executor = ToolExecutor(backend.application_root, output, approve, session_permissions=grants)
+    executor.agent_mode = "auto"
+    executor.shell_backend = backend
+    executor.begin_turn(str(work))
+    assemble_system_prompt(executor, SimpleNamespace(snapshot=lambda: []))
+    target = work / "state.py"
+    target.write_text("x = 1\n")
+    await executor.execute_batch([call("ReadFile", {"path": str(target)}, "read")])
+    command = "printf 'x = 3\\n' > state.py" if changed else "printf inspection"
+    shell = await executor.execute_batch([call("Shell", {"command": command}, "shell")])
+    assert shell[0].status == "succeeded", shell[0].content
     result = await executor.execute_batch(
         [
             call(
-                "Shell",
+                "EditFile",
                 {
-                    "command": "Start-Sleep -Seconds 5; Set-Content -Path late.txt -Value bad",
-                    "timeout": 0.3,
+                    "path": str(target),
+                    "old_text": "x = 1",
+                    "new_text": "x = 2",
                 },
+                "edit",
             )
         ]
     )
-    assert result[0].error_type in {"timeout", "termination_unknown"}
-    assert not (tmp_path / "late.txt").exists()
-    assert "0.3" in approvals[0]["description"]
+    assert result[0].status == ("failed" if changed else "succeeded")
+    assert result[0].error_type == ("stale_read" if changed else None)
+    assert target.read_text() == ("x = 3\n" if changed else "x = 2\n")
 
 
-@pytest.mark.asyncio
-async def test_cancel_running_shell_records_and_no_next_tool(tmp_path, setup_tools):
-    executor, output, _, events = setup_tools
-    started = asyncio.Event()
-    original = executor.emit
+@pytest.mark.skipif(
+    os.name == "nt", reason="POSIX command fixture; Windows policy needs platform CI"
+)
+async def test_real_sandbox_workspace_secret_outside_network_and_environment(tmp_path, monkeypatch):
+    backend, work, output = await verified(tmp_path)
+    (work / ".env").write_text("SECRET")
+    (tmp_path / "outside").write_text("OUTSIDE")
+    monkeypatch.setenv("OPENAI_API_KEY", "DO_NOT_INHERIT")
+    status, content, _ = await backend.run(
+        root=work,
+        command="echo ok > allowed; cat .env; cat ../outside; echo bad > ../escape; printenv OPENAI_API_KEY",
+        timeout=5,
+        output_store=output,
+        call_id="boundary",
+        emit=lambda *a, **k: None,
+    )
+    assert (work / "allowed").read_text().strip() == "ok"
+    assert not (tmp_path / "escape").exists()
+    assert "SECRET" not in content and "OUTSIDE" not in content and "DO_NOT_INHERIT" not in content
+    assert status == "failed"
 
-    def emit(kind, **data):
-        original(kind, **data)
-        if kind == "tool_running":
-            started.set()
 
-    executor.emit = emit
+@pytest.mark.skipif(
+    os.name == "nt", reason="POSIX command fixture; Windows policy needs platform CI"
+)
+async def test_shell_timeout_and_cancel_settle_children(tmp_path):
+    backend, work, output = await verified(tmp_path)
+    status, _, reason = await backend.run(
+        root=work,
+        command="sleep 10; echo bad > timed",
+        timeout=0.15,
+        output_store=output,
+        call_id="timeout",
+        emit=lambda *a, **k: None,
+    )
+    assert status == "failed" and reason == "timeout"
     task = asyncio.create_task(
-        executor.execute_batch(
-            [
-                call(
-                    "Shell",
-                    {
-                        "command": "Write-Output started; Start-Sleep -Seconds 10; Set-Content late.txt bad"
-                    },
-                    "shell",
-                ),
-                call("WriteFile", {"path": "never.txt", "content": "bad"}, "write"),
-            ]
+        backend.run(
+            root=work,
+            command="sleep 1; echo bad > cancelled",
+            timeout=10,
+            output_store=output,
+            call_id="cancel",
+            emit=lambda *a, **k: None,
         )
     )
-    await started.wait()
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.15)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert not (tmp_path / "never.txt").exists()
-    assert not (tmp_path / "late.txt").exists()
-    assert output.records
-    assert any(
-        kind == "tool_result" and data["status"] in {"cancelled", "unknown"}
-        for kind, data in events
+    await asyncio.sleep(1.1)
+    assert not (work / "timed").exists() and not (work / "cancelled").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX fixture")
+async def test_shell_python_uses_actual_runtime_without_broadening_boundaries(
+    tmp_path, monkeypatch
+):
+    backend, work, output = await verified(tmp_path)
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    (backend.application_root / "private.txt").write_text("PRIVATE")
+    (tmp_path / "outside").write_text("OUTSIDE")
+    (work / ".env").write_text("SECRET")
+    program = (
+        "import sys; from pathlib import Path; "
+        "Path('version.txt').write_text(sys.executable); "
+        f"paths = {list(map(str, [work / '.env', tmp_path / 'outside', backend.application_root / 'private.txt']))!r}; "
+        "blocked=0\n"
+        "for p in paths:\n"
+        " try: Path(p).read_text()\n"
+        " except PermissionError: blocked += 1\n"
+        "assert blocked == 3\n"
+        "print('PYTHON_OK')\n"
     )
+    import shlex
 
-
-@pytest.mark.asyncio
-async def test_spool_allocation_failure_never_starts_child(tmp_path, setup_tools, monkeypatch):
-    executor, *_ = setup_tools
-
-    async def forbidden_spawn(*args, **kwargs):
-        raise AssertionError("A process was started before output storage was ready")
-
-    def failed_storage(*args, **kwargs):
-        raise OSError("disk full")
-
-    monkeypatch.setattr(shell.asyncio, "create_subprocess_exec", forbidden_spawn)
-    monkeypatch.setattr(shell.tempfile, "TemporaryFile", failed_storage)
-    result = await executor.execute_batch(
-        [
-            call("Shell", {"command": "Write-Output hello"}),
-            call("WriteFile", {"path": "never", "content": "no"}, "write"),
-        ]
+    status, content, _ = await backend.run(
+        root=work,
+        command="python3 -c " + shlex.quote(program),
+        timeout=5,
+        output_store=output,
+        call_id="python",
+        emit=lambda *a, **k: None,
     )
-    assert result[0].error_type == "storage_error"
-    assert executor.terminal_failed
-    assert not (tmp_path / "never").exists()
+    assert status == "succeeded", content
+    assert "PYTHON_OK" in content
+    from pathlib import Path
+
+    assert Path((work / "version.txt").read_text()).resolve() == Path(sys.executable).resolve()
 
 
-@pytest.mark.asyncio
-async def test_spool_write_failure_terminates_running_child(tmp_path, setup_tools, monkeypatch):
-    executor, *_ = setup_tools
-    original = shell.tempfile.TemporaryFile
+@pytest.mark.skipif(os.name == "nt", reason="POSIX fixture")
+async def test_pinned_self_test_python_is_read_only_and_preserves_secret_boundaries(tmp_path):
+    import shlex
+    from pathlib import Path
 
-    class FailedSpool:
-        def __init__(self, *args, **kwargs):
-            self.file = original(*args, **kwargs)
+    from backend.execution.process import capture
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            self.file.close()
-
-        def __getattr__(self, name):
-            return getattr(self.file, name)
-
-        def write(self, content):
-            raise OSError("disk full")
-
-    monkeypatch.setattr(shell.tempfile, "TemporaryFile", FailedSpool)
-    result = await executor.execute_batch(
-        [
-            call(
-                "Shell",
-                {
-                    "command": "Write-Output hello; Start-Sleep -Seconds 10; Set-Content late.txt bad"
-                },
-            ),
-            call("WriteFile", {"path": "never", "content": "no"}, "write"),
-        ]
+    backend, work, output = await verified(tmp_path)
+    environment = tmp_path / "self-test-env"
+    code, _, err = await capture(
+        [sys.executable, "-m", "venv", "--without-pip", str(environment)], tmp_path, {}, 20
     )
-    assert result[0].error_type == "storage_error"
-    assert executor.terminal_failed
-    assert not (tmp_path / "late.txt").exists()
-    assert not (tmp_path / "never").exists()
-
-
-@pytest.mark.asyncio
-async def test_configured_shell_executable_is_used(tmp_path, setup_tools, monkeypatch):
-    executor, *_ = setup_tools
-    seen = []
-    original = shell.asyncio.create_subprocess_exec
-    executable = shutil.which("powershell") or shutil.which("pwsh")
-    executor.shell_executable = executable
-
-    async def spawn(program, *args, **kwargs):
-        seen.append(program)
-        return await original(program, *args, **kwargs)
-
-    monkeypatch.setattr(shell.asyncio, "create_subprocess_exec", spawn)
-    result = await executor.execute_batch([call("Shell", {"command": "Write-Output yes"})])
-    assert result[0].status == "succeeded"
-    assert seen[0] == executable
-
-
-@pytest.mark.asyncio
-async def test_powershell_chinese_output_is_utf8(tmp_path, setup_tools):
-    executor, _, approvals, _ = setup_tools
-    executor.shell_executable = shutil.which("powershell") or shutil.which("pwsh")
-    result = await executor.execute_batch(
-        [
-            call(
-                "Shell",
-                {
-                    "command": "Write-Output '你好，minicode'; [Console]::Error.WriteLine('错误详情')"
-                },
-            )
-        ]
+    assert code == 0, err
+    # Use the concrete interpreter, without granting the whole uv installation.
+    binary = environment / "bin/python3"
+    target = binary.resolve()
+    binary.unlink()
+    binary.symlink_to(target)
+    config = environment / "pyvenv.cfg"
+    config.write_text(
+        "\n".join(
+            "home = " + str(Path(line.split("=", 1)[1].strip()).resolve())
+            if line.startswith("home =")
+            else line
+            for line in config.read_text().splitlines()
+        )
+        + "\n"
     )
-    assert result[0].status == "succeeded"
-    assert "你好，minicode" in result[0].content
-    assert "错误详情" in result[0].content
-    assert shell.UTF8_PRELUDE in approvals[0]["description"]
+    packages = next((environment / "lib").glob("python*/site-packages"))
+    (packages / "self_test_fixture.py").write_text("MARKER = 'PINNED'\n")
+    (work / ".env").write_text("SECRET")
+    (tmp_path / "outside").write_text("OUTSIDE")
+    backend.python_environment = environment
+    backend.runtime_roots = (environment,)
+    program = (
+        "import sys; from pathlib import Path; import self_test_fixture; "
+        f"assert Path(sys.prefix) == Path({str(environment)!r}); "
+        "assert self_test_fixture.MARKER == 'PINNED'; blocked=0\n"
+        f"for path, action in {[(str(work / '.env'), 'read'), (str(tmp_path / 'outside'), 'read'), (str(packages / 'self_test_fixture.py'), 'write')]!r}:\n"
+        " try:\n"
+        "  p=Path(path); p.read_text() if action=='read' else p.write_text('tampered')\n"
+        " except PermissionError: blocked+=1\n"
+        "assert blocked==3; print('PINNED_AND_ISOLATED')"
+    )
+    status, content, _ = await backend.run(
+        root=work,
+        command="python3 -c " + shlex.quote(program),
+        timeout=10,
+        output_store=output,
+        call_id="pinned-python",
+        emit=lambda *a, **k: None,
+    )
+    assert status == "succeeded", content
+    assert "PINNED_AND_ISOLATED" in content
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX pipeline fixture")
+async def test_pipeline_preserves_failed_python_status(tmp_path):
+    backend, work, output = await verified(tmp_path)
+    status, content, reason = await backend.run(
+        root=work,
+        command="python3 -c \"raise RuntimeError('REPRODUCED_FAILURE')\" 2>&1 | tail -2",
+        timeout=10,
+        output_store=output,
+        call_id="pipeline",
+        emit=lambda *a, **k: None,
+    )
+    assert status == "failed" and reason == "exit_code"
+    assert "exit_code=1" in content and "REPRODUCED_FAILURE" in content

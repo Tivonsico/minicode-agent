@@ -1,5 +1,7 @@
 # 智谱接口核实记录
 
+> 2026-10-08 更新：下面保留早期验证记录。现已移除环境中的 `CONTEXT_WINDOW`，启动通过服务端元数据或 Models.dev 解析窗口，不再使用早期 200K 手工预算。当前官方 [GLM-5.3-Flash 页面](https://docs.bigmodel.cn/cn/guide/models/vlm/glm-5.3-flash.md)已公布模型能力；具体目录值带来源记录，目录仍属于社区维护资料。通用配置和边界见 README。
+
 核实日期：2026-09-10。仅文档核实及离线模拟，尚未以真实密钥完成服务调用。
 
 - [对话补全官方文档](https://docs.bigmodel.cn/api-reference/模型-api/对话补全)：确认官方端点、Bearer 认证、四种消息身份、原生函数调用、SSE `[DONE]` 结束标记，以及 usage 字段。程序要求明确结束原因与结束标记，缺少用量保持未知。

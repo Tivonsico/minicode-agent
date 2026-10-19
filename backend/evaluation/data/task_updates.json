@@ -1,0 +1,16 @@
+{
+  "feature-duration": [
+    "实现 parse_duration(text)：支持由整数与h/m/s组成的连续字符串，返回秒数；空串或无效格式抛ValueError。"
+  ],
+  "feature-csv": [
+    "实现 parse_csv(text)：首行为字段名，返回记录字典列表；支持引号内逗号，空输入返回空列表。"
+  ],
+  "multi-sort": [
+    "实现 sort_records(rows,key)：按指定键升序排序，保持同键记录的原顺序，返回新列表。",
+    "增加reverse=False参数；为True时降序排序，同键仍稳定，旧的升序行为不能改变。"
+  ],
+  "multi-group": [
+    "实现 group_by(rows,key)，返回字典：同键的记录组成列表，记录顺序不变。",
+    "增加ordered_groups(rows,key)，返回[[键,记录列表],...]，分组键按首次出现顺序。保留原group_by API。"
+  ]
+}

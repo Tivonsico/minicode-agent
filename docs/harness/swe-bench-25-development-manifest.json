@@ -1,0 +1,67 @@
+{
+  "stage": "development",
+  "selection_rule": "first unresolved with official judgment per repository, in original manifest order; at most one per repository",
+  "source_backend_code_digest": "072469836f260efb7c3221a5135a5c18b8734ccb234965dc1b30ddec6f3212ba",
+  "native_profiles_digest": "c26729d33b8a65e7f763670ff83f46b3784f9feea7a2e8e024143596de19d5eb",
+  "model": "GLM-5.3-Flash",
+  "options": {
+    "dataset_id": "swe_lite",
+    "agent_mode": "auto",
+    "approval_behavior": "approve",
+    "reasoning_effort": "low",
+    "agent_timeout_seconds": 600,
+    "grader_timeout_seconds": 900
+  },
+  "tasks": [
+    {
+      "instance_id": "django__django-11564",
+      "repo": "django/django",
+      "base_commit": "580e644f24f1c5ae5b94784fb73a9953a178fd26",
+      "version": "3.1",
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-11564:latest",
+      "metadata_blob": "7caf8169e5314792cc5d87b2cacad17db27e1657",
+      "selection_rank": "06c151d469c7f06d22076a54dff16008e2daf4111521bcbd561ebd2903b18eb5",
+      "index": 6,
+      "batch": 1
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11148",
+      "repo": "pytest-dev/pytest",
+      "base_commit": "2f7415cfbc4b6ca62f9013f1abd27136f46b9653",
+      "version": "8.0",
+      "image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11148:latest",
+      "metadata_blob": "2aeb17f15d9f03f8b193d186d640866d6b7b873e",
+      "selection_rank": "422fce539fe8134da1595040f035eada5c63e3560c58c214e5f9aa9c7fa3bfd9",
+      "index": 9,
+      "batch": 1
+    },
+    {
+      "instance_id": "psf__requests-2148",
+      "repo": "psf/requests",
+      "base_commit": "fe693c492242ae532211e0c173324f09ca8cf227",
+      "version": "2.3",
+      "image": "swebench/sweb.eval.x86_64.psf_1776_requests-2148:latest",
+      "metadata_blob": "220099c3ab458232405560f4036afb674f2bf629",
+      "selection_rank": "4980fe1ac6c319f59a703e3e3bba882b0481af274721a4909c5ae022656ee8a1",
+      "index": 13,
+      "batch": 2
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-7738",
+      "repo": "sphinx-doc/sphinx",
+      "base_commit": "c087d717f6ed183dd422359bf91210dc59689d63",
+      "version": "3.1",
+      "image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7738:latest",
+      "metadata_blob": "a20d0eb019c61e4f60a4ca3379d2a52a900e2472",
+      "selection_rank": "227b0c444300c1ea6fe738597e7fe45e694b9dac2516183613a6caedf087ec57",
+      "index": 16,
+      "batch": 2
+    }
+  ],
+  "planned_runs": {
+    "original_first": 1,
+    "baseline_repeat": 1,
+    "after_repair": 2
+  },
+  "limitations": "Selected failures are a development set. Repeated baseline and two new-version runs are recorded without causal or overall-rate claims."
+}

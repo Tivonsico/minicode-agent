@@ -2,11 +2,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from memory.project_lock import ProjectLock
+from backend.storage.project_lock import ProjectLock
 
 
 def attempt(root):
-    code = "from pathlib import Path; from memory.project_lock import ProjectLock; import sys; lock=ProjectLock(Path(sys.argv[1])); lock.acquire(); lock.release()"
+    code = "from pathlib import Path; from backend.storage.project_lock import ProjectLock; import sys; lock=ProjectLock(Path(sys.argv[1])); lock.acquire(); lock.release()"
     return subprocess.run(
         [sys.executable, "-c", code, str(root)],
         cwd=Path(__file__).resolve().parents[1],
@@ -28,7 +28,7 @@ def test_process_exit_releases_lock_and_projects_are_independent(tmp_path):
     one, two = tmp_path / "one", tmp_path / "two"
     one.mkdir()
     two.mkdir()
-    code = "from pathlib import Path; from memory.project_lock import ProjectLock; import sys; lock=ProjectLock(Path(sys.argv[1])); lock.acquire(); print('locked', flush=True); sys.stdin.read()"
+    code = "from pathlib import Path; from backend.storage.project_lock import ProjectLock; import sys; lock=ProjectLock(Path(sys.argv[1])); lock.acquire(); print('locked', flush=True); sys.stdin.read()"
     child = subprocess.Popen(
         [sys.executable, "-c", code, str(one)],
         cwd=Path(__file__).resolve().parents[1],

@@ -5,16 +5,16 @@ from copy import deepcopy
 
 import pytest
 
-from agent.loop import AgentLoop
-from config import Config
-from conversation.provider import ProviderError, Response
-from memory.output_store import OutputStore
-from memory.permission_state import SessionPermissions
-from memory.project_assets import ProjectAssets
-from memory.session_store import SessionStore
+from backend.config import Config
+from backend.context.project_assets import ProjectAssets
+from backend.conversation.store import SessionStore
+from backend.permissions.directories import SessionPermissions
+from backend.runtime.loop import AgentLoop
+from backend.runtime.provider import ProviderError, Response
+from backend.storage.output_store import OutputStore
+from backend.tools.base import ToolResult
+from backend.tools.executor import ToolExecutor
 from test.support.tooling import call
-from tools.base import ToolResult
-from tools.executor import ToolExecutor
 
 
 class FakeMemory:
@@ -109,13 +109,13 @@ async def test_agent_can_auto_select_multiple_installed_skills(tmp_path):
     ):
         directory = tmp_path / "skill" / "skills" / name
         directory.mkdir(parents=True)
-        (directory / "SKILL.md").write_text(
-            f"description: {description}\n{body}", encoding="utf-8"
-        )
-    provider = ScriptedProvider([
-        Response("", [call("UseSkill", {"names": ["frontend", "tests"]})], "tool_calls", None),
-        Response("done", [], "stop", None),
-    ])
+        (directory / "SKILL.md").write_text(f"description: {description}\n{body}", encoding="utf-8")
+    provider = ScriptedProvider(
+        [
+            Response("", [call("UseSkill", {"names": ["frontend", "tests"]})], "tool_calls", None),
+            Response("done", [], "stop", None),
+        ]
+    )
     store = SessionStore(tmp_path)
 
     async def approve(_request):
@@ -124,7 +124,11 @@ async def test_agent_can_auto_select_multiple_installed_skills(tmp_path):
     executor = ToolExecutor(tmp_path, OutputStore(store), approve)
     loop = AgentLoop(
         Config(tmp_path, "test-key", context_window=10000, max_output_tokens=1000),
-        store, provider, executor, FakeContext(), FakeMemory(),
+        store,
+        provider,
+        executor,
+        FakeContext(),
+        FakeMemory(),
     )
     assert await loop.run("Build a UI and its tests") == "completed"
     assert "frontend: Build UI" in provider.messages[0][0]["content"]
@@ -153,17 +157,27 @@ async def test_project_prompts_are_path_scoped_and_not_duplicated(tmp_path):
         skill.mkdir()
         (skill / "SKILL.md").write_text(f"description: {marker}", encoding="utf-8")
     (second / "readme.txt").write_text("hello", encoding="utf-8")
-    provider = ScriptedProvider([
-        Response("", [call("ReadFile", {"path": str(second / "readme.txt")})], "tool_calls", None),
-        Response("done", [], "stop", None),
-    ])
+    provider = ScriptedProvider(
+        [
+            Response(
+                "", [call("ReadFile", {"path": str(second / "readme.txt")})], "tool_calls", None
+            ),
+            Response("done", [], "stop", None),
+        ]
+    )
 
     async def approve(_request):
         return True
 
     executor = ToolExecutor(app_root, OutputStore(store), approve, session_permissions=grants)
-    loop = AgentLoop(Config(app_root, "test-key", context_window=10000, max_output_tokens=1000),
-                     store, provider, executor, FakeContext(), FakeMemory())
+    loop = AgentLoop(
+        Config(app_root, "test-key", context_window=10000, max_output_tokens=1000),
+        store,
+        provider,
+        executor,
+        FakeContext(),
+        FakeMemory(),
+    )
     assert await loop.run(f"Check {first} and {second}") == "completed"
     for messages in provider.messages:
         system = messages[0]["content"]
@@ -187,18 +201,36 @@ async def test_new_project_prompt_loaded_before_cross_project_write(tmp_path):
     grants.add(str(first))
     ProjectAssets(app_root).project_path(second).write_text("SECOND_WRITE_RULE", encoding="utf-8")
     target = second / "new.txt"
-    provider = ScriptedProvider([
-        Response("", [call("WriteFile", {"path": str(target), "content": "made"}, "one")], "tool_calls", None),
-        Response("", [call("WriteFile", {"path": str(target), "content": "made"}, "two")], "tool_calls", None),
-        Response("done", [], "stop", None),
-    ])
+    provider = ScriptedProvider(
+        [
+            Response(
+                "",
+                [call("WriteFile", {"path": str(target), "content": "made"}, "one")],
+                "tool_calls",
+                None,
+            ),
+            Response(
+                "",
+                [call("WriteFile", {"path": str(target), "content": "made"}, "two")],
+                "tool_calls",
+                None,
+            ),
+            Response("done", [], "stop", None),
+        ]
+    )
 
     async def approve(_request):
         return True
 
     executor = ToolExecutor(app_root, OutputStore(store), approve, session_permissions=grants)
-    loop = AgentLoop(Config(app_root, "test-key", context_window=10000, max_output_tokens=1000),
-                     store, provider, executor, FakeContext(), FakeMemory())
+    loop = AgentLoop(
+        Config(app_root, "test-key", context_window=10000, max_output_tokens=1000),
+        store,
+        provider,
+        executor,
+        FakeContext(),
+        FakeMemory(),
+    )
     assert await loop.run("Create a file in the other authorized project") == "completed"
     assert "SECOND_WRITE_RULE" not in provider.messages[0][0]["content"]
     assert provider.messages[1][0]["content"].count("SECOND_WRITE_RULE") == 1

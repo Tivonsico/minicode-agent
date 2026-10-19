@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "task_revision": "3d07b464b7b311a0cbfb5ed5b2d8a3b96f84a33d",
+  "dataset_id": "swe_lite",
+  "source": "https://github.com/SWE-bench/swe-bench-tasks.git",
+  "split": "test",
+  "selection_seed": "minicode-unseen-25-2026-10-12-v1",
+  "eligible_repositories": [
+    "django/django",
+    "psf/requests",
+    "pylint-dev/pylint",
+    "pytest-dev/pytest",
+    "sphinx-doc/sphinx",
+    "sympy/sympy"
+  ],
+  "selection_method": "SHA256(seed + ':' + instance_id), ascending per repository; sorted repository round-robin, first 25",
+  "repository_scope_reason": "Native macOS self-test scope: six Python repositories without mandatory compiled scientific extensions; not all Lite repositories",
+  "excluded_instance_ids": [
+    "sympy__sympy-19487",
+    "sympy__sympy-20049",
+    "sympy__sympy-20154",
+    "sympy__sympy-20212",
+    "sympy__sympy-20590"
+  ],
+  "history_job_ids": [
+    "1ff4e60b68a14875a8033f0059f9f0f6",
+    "2bcc881e762c46c3b7c6f8c87f174fe6",
+    "2e1306f682b0457eb21d630512563837",
+    "590397e703174931af127edfd72e2a40",
+    "784a151643924af5b6b16b2a37570589",
+    "818b74e8bc264ee69cdfe406dd28f0b1",
+    "8880c5fa9869458ebd69448a516c405b",
+    "d8f82d1749b74e41a7ad1b253f761414"
+  ],
+  "eligible_counts": {
+    "django/django": 114,
+    "psf/requests": 6,
+    "pylint-dev/pylint": 6,
+    "pytest-dev/pytest": 17,
+    "sphinx-doc/sphinx": 16,
+    "sympy/sympy": 72
+  },
+  "options": {
+    "dataset_id": "swe_lite",
+    "agent_mode": "auto",
+    "approval_behavior": "approve",
+    "reasoning_effort": "low",
+    "agent_timeout_seconds": 600,
+    "grader_timeout_seconds": 900
+  },
+  "model": "GLM-5.3-Flash",
+  "request_limit": 30,
+  "harness_version": "5.0.2",
+  "tasks": [
+    {
+      "instance_id": "django__django-11797",
+      "repo": "django/django",
+      "base_commit": "3346b78a8a872286a245d1e77ef4718fc5e6be1a",
+      "version": "3.1",
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-11797:latest",
+      "metadata_blob": "712794cfd7e5e846fbd484e948dfa720c6765a66",
+      "selection_rank": "02dc5e327b0758a9971626bdc977a84fbb17b0b6d546e4ec2d75d5bcf099245e",
+      "index": 0,
+      "batch": 1
+    },
+    {
+      "instance_id": "psf__requests-3362",
+      "repo": "psf/requests",
+      "base_commit": "36453b95b13079296776d11b09cab2567ea3e703",
+      "version": "2.10",
+      "image": "swebench/sweb.eval.x86_64.psf_1776_requests-3362:latest",
+      "metadata_blob": "ce52911009ff47a9f917768cec659a04542c2325",
+      "selection_rank": "07bd73df97f524b0c24796d6eb0a1a5a9374a982f31fe038cab9ce1e9a1de101",
+      "index": 1,
+      "batch": 1
+    },
+    {
+      "instance_id": "pylint-dev__pylint-7080",
+      "repo": "pylint-dev/pylint",
+      "base_commit": "3c5eca2ded3dd2b59ebaf23eb289453b5d2930f0",
+      "version": "2.15",
+      "image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7080:latest",
+      "metadata_blob": "9ce14e0ceb3dd22afb0c20cc046f1401f25fc125",
+      "selection_rank": "3c0c05f1907b15aeba69c8b6f1b8b90f70f4b43633345280641e6acaf12b993d",
+      "index": 2,
+      "batch": 1
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5103",
+      "repo": "pytest-dev/pytest",
+      "base_commit": "10ca84ffc56c2dd2d9dc4bd71b7b898e083500cd",
+      "version": "4.5",
+      "image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-5103:latest",
+      "metadata_blob": "c84510ed1a22501399807ffd0e12253312d2f595",
+      "selection_rank": "01a30fc1090644f17c459e23077abb10d4d0ebd20061231c501f6ac8e594ecb2",
+      "index": 3,
+      "batch": 1
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-8435",
+      "repo": "sphinx-doc/sphinx",
+      "base_commit": "5d8d6275a54f2c5fb72b82383b5712c22d337634",
+      "version": "3.4",
+      "image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-8435:latest",
+      "metadata_blob": "7f431985cd86a73d7ee9ccd71e5f5d028cde8091",
+      "selection_rank": "1404d30f0f03874d4709a5a1a1245df6cc2e63e8e7eb2e9ef2010de02b470cac",
+      "index": 4,
+      "batch": 1
+    },
+    {
+      "instance_id": "sympy__sympy-18087",
+      "repo": "sympy/sympy",
+      "base_commit": "9da013ad0ddc3cd96fe505f2e47c63e372040916",
+      "version": "1.6",
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-18087:latest",
+      "metadata_blob": "67cc3be4e13a4b96ce24507e2497063e1ade997c",
+      "selection_rank": "11063ae54079ecda1548041d10e7a78149ead87039a7fc7509a5559b7c234b5c",
+      "index": 5,
+      "batch": 1
+    },
+    {
+      "instance_id": "django__django-11564",
+      "repo": "django/django",
+      "base_commit": "580e644f24f1c5ae5b94784fb73a9953a178fd26",
+      "version": "3.1",
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-11564:latest",
+      "metadata_blob": "7caf8169e5314792cc5d87b2cacad17db27e1657",
+      "selection_rank": "06c151d469c7f06d22076a54dff16008e2daf4111521bcbd561ebd2903b18eb5",
+      "index": 6,
+      "batch": 1
+    },
+    {
+      "instance_id": "psf__requests-863",
+      "repo": "psf/requests",
+      "base_commit": "a0df2cbb10419037d11d04352b3175405ab52941",
+      "version": "0.14",
+      "image": "swebench/sweb.eval.x86_64.psf_1776_requests-863:latest",
+      "metadata_blob": "a62caca20ca69ce0b1e77af2d953886357848f20",
+      "selection_rank": "30eed6e82c60689fda91f4a5a083e5a85307dce3c2dbe92f070ac3f449209f8b",
+      "index": 7,
+      "batch": 1
+    },
+    {
+      "instance_id": "pylint-dev__pylint-5859",
+      "repo": "pylint-dev/pylint",
+      "base_commit": "182cc539b8154c0710fcea7e522267e42eba8899",
+      "version": "2.13",
+      "image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-5859:latest",
+      "metadata_blob": "425ef3529e198b73ec0573962722678d5413474a",
+      "selection_rank": "663a829229674f9c7c1368c134b4090482e8dab24a7449430c8054e662deb789",
+      "index": 8,
+      "batch": 1
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11148",
+      "repo": "pytest-dev/pytest",
+      "base_commit": "2f7415cfbc4b6ca62f9013f1abd27136f46b9653",
+      "version": "8.0",
+      "image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11148:latest",
+      "metadata_blob": "2aeb17f15d9f03f8b193d186d640866d6b7b873e",
+      "selection_rank": "422fce539fe8134da1595040f035eada5c63e3560c58c214e5f9aa9c7fa3bfd9",
+      "index": 9,
+      "batch": 1
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-11445",
+      "repo": "sphinx-doc/sphinx",
+      "base_commit": "71db08c05197545944949d5aa76cd340e7143627",
+      "version": "7.1",
+      "image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-11445:latest",
+      "metadata_blob": "e5e52c56d37ccdf23f4d4ed35c50b1b8064ed0de",
+      "selection_rank": "20652ca53cea818d807756dd45d8fb7ee86a65210ef7b0497a6987c2b506090a",
+      "index": 10,
+      "batch": 2
+    },
+    {
+      "instance_id": "sympy__sympy-15609",
+      "repo": "sympy/sympy",
+      "base_commit": "15f56f3b0006d2ed2c29bde3c43e91618012c849",
+      "version": "1.4",
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-15609:latest",
+      "metadata_blob": "13aec0a4c88bb50c94c7941e72b4d65085bea8e2",
+      "selection_rank": "19926835f3d64b0268e4883ec9c5d31c5814e65a42421fe38093f829efdc5ffe",
+      "index": 11,
+      "batch": 2
+    },
+    {
+      "instance_id": "django__django-12708",
+      "repo": "django/django",
+      "base_commit": "447980e72ac01da1594dd3373a03ba40b7ee6f80",
+      "version": "3.1",
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-12708:latest",
+      "metadata_blob": "e3ca29d7ef22110981119afa42b89e2e2323a9ea",
+      "selection_rank": "06c24401d2a0b84d4a960ce5835d9c0badb8fc2d57f2916c06b33a4149f0457f",
+      "index": 12,
+      "batch": 2
+    },
+    {
+      "instance_id": "psf__requests-2148",
+      "repo": "psf/requests",
+      "base_commit": "fe693c492242ae532211e0c173324f09ca8cf227",
+      "version": "2.3",
+      "image": "swebench/sweb.eval.x86_64.psf_1776_requests-2148:latest",
+      "metadata_blob": "220099c3ab458232405560f4036afb674f2bf629",
+      "selection_rank": "4980fe1ac6c319f59a703e3e3bba882b0481af274721a4909c5ae022656ee8a1",
+      "index": 13,
+      "batch": 2
+    },
+    {
+      "instance_id": "pylint-dev__pylint-7114",
+      "repo": "pylint-dev/pylint",
+      "base_commit": "397c1703e8ae6349d33f7b99f45b2ccaf581e666",
+      "version": "2.15",
+      "image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7114:latest",
+      "metadata_blob": "b4c241d916d516eb1d3579dfb6d2403749d43640",
+      "selection_rank": "72c88d0e1f08ed83a30862fee6bec0dfc6c40adedcadf86e1576c8c48f045068",
+      "index": 14,
+      "batch": 2
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7220",
+      "repo": "pytest-dev/pytest",
+      "base_commit": "56bf819c2f4eaf8b36bd8c42c06bb59d5a3bfc0f",
+      "version": "5.4",
+      "image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-7220:latest",
+      "metadata_blob": "5f9baa64b87f2dda53f1134823f0c33a3965344a",
+      "selection_rank": "448811ac5d5818b9ffa30caee920c9c2ca0d69b78d0a2ec55dbeb2438f2ee5b3",
+      "index": 15,
+      "batch": 2
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-7738",
+      "repo": "sphinx-doc/sphinx",
+      "base_commit": "c087d717f6ed183dd422359bf91210dc59689d63",
+      "version": "3.1",
+      "image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7738:latest",
+      "metadata_blob": "a20d0eb019c61e4f60a4ca3379d2a52a900e2472",
+      "selection_rank": "227b0c444300c1ea6fe738597e7fe45e694b9dac2516183613a6caedf087ec57",
+      "index": 16,
+      "batch": 2
+    },
+    {
+      "instance_id": "sympy__sympy-17655",
+      "repo": "sympy/sympy",
+      "base_commit": "f5e965947af2410ded92cfad987aaf45262ea434",
+      "version": "1.5",
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-17655:latest",
+      "metadata_blob": "87fdbb24e1beff09a42657f589edc1f7bcbe5270",
+      "selection_rank": "1a71f15ceca16e434ab78027dfb785b2cdc029a678d19ce589fa46e545ee30ff",
+      "index": 17,
+      "batch": 2
+    },
+    {
+      "instance_id": "django__django-13660",
+      "repo": "django/django",
+      "base_commit": "50c3ac6fa9b7c8a94a6d1dc87edf775e3bc4d575",
+      "version": "3.2",
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-13660:latest",
+      "metadata_blob": "64b84ba86935d7c66e85b561c35d9de4f97ce2d6",
+      "selection_rank": "087e583f2248c9bb8117e9b88e2e2577c0c036118a5eaec59860ee49e7c4f2ff",
+      "index": 18,
+      "batch": 2
+    },
+    {
+      "instance_id": "psf__requests-1963",
+      "repo": "psf/requests",
+      "base_commit": "110048f9837f8441ea536804115e80b69f400277",
+      "version": "2.3",
+      "image": "swebench/sweb.eval.x86_64.psf_1776_requests-1963:latest",
+      "metadata_blob": "6bf24d474c5f7930fa031f2d214ef5c1de4a2ffd",
+      "selection_rank": "7f92e239753553d3ba62d213e266a39adf81f354f6b75de9b613f38a255e405e",
+      "index": 19,
+      "batch": 2
+    },
+    {
+      "instance_id": "pylint-dev__pylint-7228",
+      "repo": "pylint-dev/pylint",
+      "base_commit": "d597f252915ddcaaa15ccdfcb35670152cb83587",
+      "version": "2.15",
+      "image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7228:latest",
+      "metadata_blob": "1df3cc22d920287863eb7fd19d78aee04574faf9",
+      "selection_rank": "7ab7891f53207673425d8008fa12333a861e1d6a9453c56d955da9b3776f0507",
+      "index": 20,
+      "batch": 3
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11143",
+      "repo": "pytest-dev/pytest",
+      "base_commit": "6995257cf470d2143ad1683824962de4071c0eb7",
+      "version": "8.0",
+      "image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11143:latest",
+      "metadata_blob": "aaea63525fd0461c0557b4018e877510c1bfe8e4",
+      "selection_rank": "455b4512130aabeae2e19581dad2e7b12c0f7c7387cb775089e4aea744f2a3e1",
+      "index": 21,
+      "batch": 3
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-7975",
+      "repo": "sphinx-doc/sphinx",
+      "base_commit": "4ec6cbe341fd84468c448e20082c778043bbea4b",
+      "version": "3.2",
+      "image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7975:latest",
+      "metadata_blob": "88ae363fbc3fe163dca8f0b6d4535d43cbdd7fba",
+      "selection_rank": "396fdfbce34265daac6508630ed86e12a740f3d1c620e7af57f3e79f9a4f1c33",
+      "index": 22,
+      "batch": 3
+    },
+    {
+      "instance_id": "sympy__sympy-22840",
+      "repo": "sympy/sympy",
+      "base_commit": "d822fcba181155b85ff2b29fe525adbafb22b448",
+      "version": "1.10",
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-22840:latest",
+      "metadata_blob": "ca02dcee0aaa83d265b27dd1e1fef50b416ab73a",
+      "selection_rank": "1f5892bab46bc16ed1c60e99fca083b180342e3f8163d1137223d8511c3971fe",
+      "index": 23,
+      "batch": 3
+    },
+    {
+      "instance_id": "django__django-11133",
+      "repo": "django/django",
+      "base_commit": "879cc3da6249e920b8d54518a0ae06de835d7373",
+      "version": "3.0",
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-11133:latest",
+      "metadata_blob": "2fa553bd6ea5e9593f598fe2778050d6ad5acf8b",
+      "selection_rank": "0a634d1053dc4151bfe62ea40d08510aaa2588ebf0ac8db87879a55c4a1e05ab",
+      "index": 24,
+      "batch": 3
+    }
+  ]
+}

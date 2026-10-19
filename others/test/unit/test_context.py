@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from context import ContextManager, ContextOverflow
-from context.budget import estimate
+from backend.context import ContextManager, ContextOverflow
+from backend.context.budget import estimate
 
 
 class Store:
@@ -142,4 +142,30 @@ async def test_single_long_round_compacts_old_tools_preserves_task():
     assert await manager.prepare(messages, []) == result
     assert len(provider.requests) == requests
 
-\n
+
+async def test_compressed_history_restores_from_journal_without_new_summary(tmp_path):
+    from backend.context.checkpoint import ContextCheckpoint
+    from backend.conversation.store import SessionStore
+
+    store = SessionStore(tmp_path)
+    body = [{"role": "user", "content": "old task"}, {"role": "assistant", "content": "old answer"}]
+    prepared = [{"role": "user", "content": "Historical summary: old task done"}]
+    ContextCheckpoint(store).save(body, prepared, 100)
+    provider = Provider()
+    restored_store = SessionStore(tmp_path, store.session_id)
+    manager = ContextManager(
+        SimpleNamespace(context_window=8000, max_output_tokens=1000), provider, restored_store
+    )
+    result = await manager.prepare(
+        [{"role": "system", "content": "new system rules"}]
+        + body
+        + [{"role": "user", "content": "next"}],
+        [],
+    )
+    assert result == [{"role": "system", "content": "new system rules"}] + prepared + [
+        {"role": "user", "content": "next"}
+    ]
+    assert provider.requests == []
+    assert (
+        ContextCheckpoint(restored_store).restore([{"role": "user", "content": "changed"}]) is None
+    )

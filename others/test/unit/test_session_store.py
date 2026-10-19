@@ -2,8 +2,38 @@ import json
 
 import pytest
 
-from memory.output_store import OutputStore
-from memory.session_store import SessionStore
+from backend.conversation.store import SessionStore
+from backend.storage.output_store import OutputStore
+
+
+def test_uncertain_sync_freezes_writer_until_reopen(tmp_path, monkeypatch):
+    from backend.conversation import store as module
+
+    store = SessionStore(tmp_path)
+    real_sync = module.os.fsync
+    monkeypatch.setattr(module.os, "fsync", lambda fd: (_ for _ in ()).throw(OSError("disk")))
+    with pytest.raises(OSError):
+        store.append("notice", text="first")
+    monkeypatch.setattr(module.os, "fsync", real_sync)
+    with pytest.raises(OSError, match="reopen"):
+        store.append("notice", text="must not reuse seq")
+    reopened = SessionStore(tmp_path, store.session_id)
+    reopened.append("notice", text="after verification")
+    assert [e["seq"] for e in reopened.events] == [1, 2]
+
+
+def test_output_sync_failure_cannot_publish_a_durable_reference(tmp_path, monkeypatch):
+    import os
+
+    store = SessionStore(tmp_path)
+
+    def fail(fd):
+        raise OSError("output not durable")
+
+    monkeypatch.setattr(os, "fsync", fail)
+    with pytest.raises(OSError):
+        OutputStore(store).save("one", "important evidence")
+    assert not store.path.exists() or "output_saved" not in store.path.read_text()
 
 
 def test_incomplete_tail_is_preserved_and_meta_rebuilt(tmp_path):
@@ -95,8 +125,8 @@ def test_invalid_session_ids_cannot_escape(tmp_path, session_id):
 
 
 def test_known_secret_redacted_before_journal_and_outputs(tmp_path):
-    from memory.output_store import OutputStore
-    from memory.session_store import SessionStore
+    from backend.conversation.store import SessionStore
+    from backend.storage.output_store import OutputStore
 
     secret = "never-persist-this-secret"
     store = SessionStore(tmp_path, secrets=(secret,))
@@ -115,7 +145,7 @@ def test_atomic_metadata_retries_transient_windows_lock_but_not_permanent_error(
 
     import pytest
 
-    from memory import session_store
+    from backend.conversation import store as session_store
 
     original = session_store.os.replace
     calls = []

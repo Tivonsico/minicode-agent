@@ -1,7 +1,7 @@
 import pytest
 
-from tools.command_guard import classify
-from tools.permissions import Action, PermissionPolicy
+from backend.permissions.policy import Action, PermissionPolicy
+from backend.tools.command_guard import classify
 
 
 def test_default_decision_table_and_hard_boundary():

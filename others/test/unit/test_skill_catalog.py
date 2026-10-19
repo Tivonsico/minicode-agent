@@ -1,19 +1,17 @@
 import pytest
 
-from memory.permission_state import SessionPermissions
-from memory.session_store import SessionStore
-from skill import SkillCatalog
+from backend.conversation.store import SessionStore
+from backend.permissions.directories import SessionPermissions
+from backend.skills import SkillCatalog
+from backend.tools.base import ToolError
+from backend.tools.executor import ToolExecutor
 from test.support.tooling import Outputs, call
-from tools.base import ToolError
-from tools.executor import ToolExecutor
 
 
 def install(root, name, description, body):
     directory = root / "skill" / "skills" / name
     directory.mkdir(parents=True)
-    (directory / "SKILL.md").write_text(
-        f"description: {description}\n{body}", encoding="utf-8"
-    )
+    (directory / "SKILL.md").write_text(f"description: {description}\n{body}", encoding="utf-8")
     return directory
 
 
@@ -33,9 +31,7 @@ async def test_discovery_multiple_skills_and_resource_boundary(tmp_path):
         [call("ReadSkillResource", {"name": "frontend", "path": "layout.txt"})]
     )
     assert blocked[0].error_type == "skill"
-    loaded = await executor.execute_batch(
-        [call("UseSkill", {"names": ["frontend", "tests"]})]
-    )
+    loaded = await executor.execute_batch([call("UseSkill", {"names": ["frontend", "tests"]})])
     assert loaded[0].status == "succeeded"
     assert "Use the layout reference." in loaded[0].content
     assert "Cover behavior." in loaded[0].content
@@ -95,15 +91,29 @@ async def test_project_skill_uses_its_authorized_directory(tmp_path):
     assert catalog.load("review") == "description: Global review\nGLOBAL RULE"
     assert "LOCAL RULE" in catalog.load("review", "project", str(project))
     assert catalog.list("project")[0]["project_path"] == str(project)
-    executor = ToolExecutor(app_root, Outputs(app_root), lambda _: True,
-                            session_permissions=grants, skills=catalog)
-    loaded = await executor.execute_batch([call("UseSkill", {
-        "scope": "project", "project_path": str(project), "names": ["review"]})])
+    executor = ToolExecutor(
+        app_root, Outputs(app_root), lambda _: True, session_permissions=grants, skills=catalog
+    )
+    loaded = await executor.execute_batch(
+        [call("UseSkill", {"scope": "project", "project_path": str(project), "names": ["review"]})]
+    )
     assert "LOCAL RULE" in loaded[0].content and "GLOBAL RULE" not in loaded[0].content
-    resource = await executor.execute_batch([call("ReadSkillResource", {
-        "scope": "project", "project_path": str(project), "name": "review", "path": "template.txt"})])
+    resource = await executor.execute_batch(
+        [
+            call(
+                "ReadSkillResource",
+                {
+                    "scope": "project",
+                    "project_path": str(project),
+                    "name": "review",
+                    "path": "template.txt",
+                },
+            )
+        ]
+    )
     assert resource[0].content == "local template"
-    denied = await executor.execute_batch([call("UseSkill", {
-        "scope": "project", "project_path": str(app_root), "names": ["review"]})])
+    denied = await executor.execute_batch(
+        [call("UseSkill", {"scope": "project", "project_path": str(app_root), "names": ["review"]})]
+    )
     assert denied[0].status == "failed"
     assert global_skill.is_dir()

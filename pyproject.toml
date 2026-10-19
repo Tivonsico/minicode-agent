@@ -5,9 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "minicode-agent"
 version = "0.1.0"
-description = "A project-local terminal coding agent"
+description = "A local web coding agent with a modular runtime"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.28,<1", "python-dotenv>=1.0,<2", "jsonschema>=4.23,<5", "prompt-toolkit>=3.0.48,<4"]
+dependencies = [
+    "httpx>=0.28,<1",
+    "python-dotenv>=1.0,<2",
+    "jsonschema>=4.23,<5",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.34,<1",
+    "psutil>=6,<8",
+    "pymysql[rsa]>=1.1,<2",
+    "greenback>=1.3,<2",
+]
 
 [project.scripts]
 minicode = "app.main:main"
@@ -15,11 +24,16 @@ minicode = "app.main:main"
 [dependency-groups]
 dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.9,<1"]
 
-[tool.setuptools]
-py-modules = ["config"]
+[tool.setuptools.data-files]
+"share/minicode/frontend" = ["frontend/*.html", "frontend/*.css", "frontend/*.js", "frontend/*.svg"]
+"share/minicode/frontend/inspection" = ["frontend/inspection/*.js", "frontend/inspection/*.css"]
+"share/minicode/frontend/evaluation" = ["frontend/evaluation/*.js"]
 
 [tool.setuptools.packages.find]
-include = ["conversation*", "agent*", "tools*", "memory*", "context*", "app*", "skill*"]
+include = ["backend*", "app*"]
+
+[tool.setuptools.package-data]
+"backend.evaluation" = ["data/*.json", "data/*.txt"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

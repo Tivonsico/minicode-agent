@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from memory.long_memory import LongMemory
+from backend.long_memory.manager import LongMemory
 
 
 class Store:
@@ -100,3 +100,23 @@ async def test_failure_and_close_preserve_history_and_cancel_tasks(tmp_path):
     await memory.close()
     assert task.cancelled()
     assert any(e["type"] == "memory_cancelled" for e in store.events)
+
+
+async def test_project_scope_isolation_retrieval_and_deletion(tmp_path):
+    provider, store = Provider(), Store()
+    memory = LongMemory(tmp_path, provider)
+    await memory.schedule(store, "a", source("a", "Use Python", "2026-01-01"), scope="/project/a")
+    await memory.schedule(store, "b", source("b", "Use Go", "2026-01-02"), scope="/project/b")
+    assert len(memory.entries()) == 2
+    assert "Use Python" in memory.snapshot("/project/a") and "Use Go" not in memory.snapshot(
+        "/project/a"
+    )
+    assert "Use Go" in memory.snapshot("/project/b") and "Use Python" not in memory.snapshot(
+        "/project/b"
+    )
+    entry = next(item for item in memory.entries() if item["scope"] == "/project/a")
+    assert memory.delete(entry["id"])
+    restored = LongMemory(tmp_path, provider)
+    assert "Use Python" not in restored.snapshot("/project/a")
+    assert "Use Go" in restored.snapshot("/project/b")
+    await memory.close()

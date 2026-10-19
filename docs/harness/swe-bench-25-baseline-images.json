@@ -1,0 +1,302 @@
+[
+  {
+    "instance_id": "django__django-11797",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.django_1776_django-11797:latest",
+      "image_id": "sha256:2d3c56fb0a332d8f393607d3ea6bf4581bcd41a78c17118ae76f5a4df00ee90f",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.django_1776_django-11797@sha256:2d3c56fb0a332d8f393607d3ea6bf4581bcd41a78c17118ae76f5a4df00ee90f"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/0/attempts/66ae065691fe4a94863ff7bf684bcefe/image.json"
+  },
+  {
+    "instance_id": "psf__requests-3362",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.psf_1776_requests-3362:latest",
+      "image_id": "sha256:c5dc4ba64a2d97d6cff6b82fe9c0561589df13f23df6883d05e99b630942bbd1",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.psf_1776_requests-3362@sha256:c5dc4ba64a2d97d6cff6b82fe9c0561589df13f23df6883d05e99b630942bbd1"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/1/attempts/da7e49e92f0345d5973b6095d889c4a5/image.json"
+  },
+  {
+    "instance_id": "pylint-dev__pylint-7080",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7080:latest",
+      "image_id": "sha256:3389f0d1319ca611d04a209fc30990c131e0bae9acfeb2163938c75ad23479fe",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7080@sha256:3389f0d1319ca611d04a209fc30990c131e0bae9acfeb2163938c75ad23479fe"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/2/attempts/7e841ed44fd34c838ff67bf9fa6c2343/image.json"
+  },
+  {
+    "instance_id": "pytest-dev__pytest-5103",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-5103:latest",
+      "image_id": "sha256:1648c614485c81d9e08bcf9ec8014fb38cd2f20fad6bea782552d923a35ce714",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-5103@sha256:1648c614485c81d9e08bcf9ec8014fb38cd2f20fad6bea782552d923a35ce714"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/3/attempts/08adc377753940e19faf03c444973b8e/image.json"
+  },
+  {
+    "instance_id": "sphinx-doc__sphinx-8435",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-8435:latest",
+      "image_id": "sha256:cbac452bf082c557820b78763d145c74780eab9ec7d58bec138e200f3289b772",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-8435@sha256:cbac452bf082c557820b78763d145c74780eab9ec7d58bec138e200f3289b772"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/4/attempts/26843a9d5d0c47018b7aa06d101ec1fd/image.json"
+  },
+  {
+    "instance_id": "sympy__sympy-18087",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-18087:latest",
+      "image_id": "sha256:7366161345db427a35b5c64a93b106072481023a24b17a42ed83589c4cdfdde1",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sympy_1776_sympy-18087@sha256:7366161345db427a35b5c64a93b106072481023a24b17a42ed83589c4cdfdde1"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/5/attempts/f7a682b1baff48a0aa3d9b68364be3df/image.json"
+  },
+  {
+    "instance_id": "django__django-11564",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.django_1776_django-11564:latest",
+      "image_id": "sha256:a565e9f99ade187a4fafee6ec7f977abd7b4ed1c96e77d13833a8fe71081aee4",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.django_1776_django-11564@sha256:a565e9f99ade187a4fafee6ec7f977abd7b4ed1c96e77d13833a8fe71081aee4"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/6/attempts/fdb4d887f9d84e4287af4c7e888d0b90/image.json"
+  },
+  {
+    "instance_id": "psf__requests-863",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.psf_1776_requests-863:latest",
+      "image_id": "sha256:4dcddfdcbc2bcba96327de327f411c671e695366f4e7d09781f64c1758053b18",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.psf_1776_requests-863@sha256:4dcddfdcbc2bcba96327de327f411c671e695366f4e7d09781f64c1758053b18"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/7/attempts/db3514d1beb74f47bd6ebe0ef0f2bb57/image.json"
+  },
+  {
+    "instance_id": "pylint-dev__pylint-5859",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-5859:latest",
+      "image_id": "sha256:12412d9d1d7a06b8fa30dd0ff14ae67177fffee77d1e6ac277606fb7334837cf",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-5859@sha256:12412d9d1d7a06b8fa30dd0ff14ae67177fffee77d1e6ac277606fb7334837cf"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/8/attempts/aa334cc4a4e3463fba7a907f266bc1a8/image.json"
+  },
+  {
+    "instance_id": "pytest-dev__pytest-11148",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11148:latest",
+      "image_id": "sha256:b8eef9af40c714067a5455e8d88620439b536a5455fed96c5646b4ed37028442",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11148@sha256:b8eef9af40c714067a5455e8d88620439b536a5455fed96c5646b4ed37028442"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/9/attempts/704c193bc2454d82bb865cfa546556d4/image.json"
+  },
+  {
+    "instance_id": "sphinx-doc__sphinx-11445",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-11445:latest",
+      "image_id": "sha256:fec58c84a7ccc38fdceb65528bfb6fb923f038cb1dc95de1f79c0a85e2dde4f2",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-11445@sha256:fec58c84a7ccc38fdceb65528bfb6fb923f038cb1dc95de1f79c0a85e2dde4f2"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/10/attempts/b1dec07f7bbc4d50996cd119d5e554ec/image.json"
+  },
+  {
+    "instance_id": "sympy__sympy-15609",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-15609:latest",
+      "image_id": "sha256:5aa1d44fd0312946e22f025db97af815c2df83c4280dd9ca0ef7577fa7df5db6",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sympy_1776_sympy-15609@sha256:5aa1d44fd0312946e22f025db97af815c2df83c4280dd9ca0ef7577fa7df5db6"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/11/attempts/0c6b657982e042e5a0a1cbcae747d5d1/image.json"
+  },
+  {
+    "instance_id": "django__django-12708",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.django_1776_django-12708:latest",
+      "image_id": "sha256:3722a130f618602e5636c8c7ddd821550e2c2462b569907c4140fc162e24671e",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.django_1776_django-12708@sha256:3722a130f618602e5636c8c7ddd821550e2c2462b569907c4140fc162e24671e"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/12/attempts/0a962a16db604c468e2c196884cc8d8e/image.json"
+  },
+  {
+    "instance_id": "psf__requests-2148",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.psf_1776_requests-2148:latest",
+      "image_id": "sha256:ada704cd7cd3d1325dc7d148d3dd473fb2a0ba75a8e703aec7ae485cabc6106a",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.psf_1776_requests-2148@sha256:ada704cd7cd3d1325dc7d148d3dd473fb2a0ba75a8e703aec7ae485cabc6106a"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/13/attempts/5ec212ba75f4435e95a9594de5a26a42/image.json"
+  },
+  {
+    "instance_id": "pylint-dev__pylint-7114",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7114:latest",
+      "image_id": "sha256:6bf0ee60d9e1bb2772f3287f54df0875884ec8aa1e24e6fad14beec46aad70b0",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7114@sha256:6bf0ee60d9e1bb2772f3287f54df0875884ec8aa1e24e6fad14beec46aad70b0"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/14/attempts/a3de016390a24ad89aa2192bd6346619/image.json"
+  },
+  {
+    "instance_id": "pytest-dev__pytest-7220",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-7220:latest",
+      "image_id": "sha256:3a9400e85df17442bbeec61d93aa3290b700c3ae26c15c8b069ef994b660a3ed",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-7220@sha256:3a9400e85df17442bbeec61d93aa3290b700c3ae26c15c8b069ef994b660a3ed"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/15/attempts/6609eacb2cd34ccfb8723f68accb34d7/image.json"
+  },
+  {
+    "instance_id": "sphinx-doc__sphinx-7738",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7738:latest",
+      "image_id": "sha256:908d80e3f2cb27da3fa10152c4da53d3be5389d39468339aad5563fda8f8e65d",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7738@sha256:908d80e3f2cb27da3fa10152c4da53d3be5389d39468339aad5563fda8f8e65d"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/16/attempts/c8e6107f15594d29a4599e37fb68e537/image.json"
+  },
+  {
+    "instance_id": "sympy__sympy-17655",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-17655:latest",
+      "image_id": "sha256:2c0112dbc185b0d0da1030ceffdb92b7730208caadb2cfbaac8af6ed9fcbddcf",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sympy_1776_sympy-17655@sha256:2c0112dbc185b0d0da1030ceffdb92b7730208caadb2cfbaac8af6ed9fcbddcf"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/17/attempts/b61c964627b8461fa02f52720ce2ba18/image.json"
+  },
+  {
+    "instance_id": "django__django-13660",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.django_1776_django-13660:latest",
+      "image_id": "sha256:57c1708a601939237732c60bacb9db0e65698cab90c8ff08a9d51a6ee9b61a8f",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.django_1776_django-13660@sha256:57c1708a601939237732c60bacb9db0e65698cab90c8ff08a9d51a6ee9b61a8f"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/18/attempts/774d1f076d914f7cbd1e2abe6122b455/image.json"
+  },
+  {
+    "instance_id": "psf__requests-1963",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.psf_1776_requests-1963:latest",
+      "image_id": "sha256:5ca751c160affa98d160831608fffe3e2c4fb61c4fb2dad2b147ef2a885088e4",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.psf_1776_requests-1963@sha256:5ca751c160affa98d160831608fffe3e2c4fb61c4fb2dad2b147ef2a885088e4"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/19/attempts/92b3dedd91bf433b98f449e6fc0cba5c/image.json"
+  },
+  {
+    "instance_id": "pylint-dev__pylint-7228",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7228:latest",
+      "image_id": "sha256:b3a905a9b866c0155cfd5af9ba55e19f1884b69eaf5b09ab4d82c1cce8b46088",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-7228@sha256:b3a905a9b866c0155cfd5af9ba55e19f1884b69eaf5b09ab4d82c1cce8b46088"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/20/attempts/6a610fa264df4e8f807c8dbe01ef9104/image.json"
+  },
+  {
+    "instance_id": "pytest-dev__pytest-11143",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11143:latest",
+      "image_id": "sha256:e08ce142adec5ec985e867e910045734ec3c58fe174fc054c5f83855bed78fd4",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.pytest-dev_1776_pytest-11143@sha256:e08ce142adec5ec985e867e910045734ec3c58fe174fc054c5f83855bed78fd4"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/21/attempts/d15f557989b540fa92099db1e1b212c2/image.json"
+  },
+  {
+    "instance_id": "sphinx-doc__sphinx-7975",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7975:latest",
+      "image_id": "sha256:6599f73068049dd8fe352bc84b617b8fa2d5b376083160f8f3c1e9a47e6751f2",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sphinx-doc_1776_sphinx-7975@sha256:6599f73068049dd8fe352bc84b617b8fa2d5b376083160f8f3c1e9a47e6751f2"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/22/attempts/8917cb84d88245e892ce0f9f6471789c/image.json"
+  },
+  {
+    "instance_id": "sympy__sympy-22840",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-22840:latest",
+      "image_id": "sha256:d1f49043c4927485fa02a3ddb2d37963def4b9d53bea9bafd2eeca17eaa7293f",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.sympy_1776_sympy-22840@sha256:d1f49043c4927485fa02a3ddb2d37963def4b9d53bea9bafd2eeca17eaa7293f"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/23/attempts/eba60979430e41fd9476e92193b72af7/image.json"
+  },
+  {
+    "instance_id": "django__django-11133",
+    "image": {
+      "requested_image": "swebench/sweb.eval.x86_64.django_1776_django-11133:latest",
+      "image_id": "sha256:914093363dbe12def92c5d36e9bdc5270cce5ed0aa6f3daad8bc4ef0389c29bf",
+      "repo_digests": [
+        "swebench/sweb.eval.x86_64.django_1776_django-11133@sha256:914093363dbe12def92c5d36e9bdc5270cce5ed0aa6f3daad8bc4ef0389c29bf"
+      ],
+      "architecture": "amd64"
+    },
+    "evidence": "/Users/mac/PycharmProjects/minicode-agent/.minicode/swe-bench/preflight-25/24/attempts/99c01e387a20452ba4cb0b10dea47aaf/image.json"
+  }
+]

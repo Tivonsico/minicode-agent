@@ -1,0 +1,35 @@
+{
+  "baseline_backend_code_digest": "072469836f260efb7c3221a5135a5c18b8734ccb234965dc1b30ddec6f3212ba",
+  "repaired_backend_code_digest": "539fec65214c29278bddd90382727161f6d3f23a0680b38b508f2698c6c4300f",
+  "native_profiles_digest": "c26729d33b8a65e7f763670ff83f46b3784f9feea7a2e8e024143596de19d5eb",
+  "files": {
+    "runtime/loop.py": {
+      "before_sha256": "6e1453c3fde800d9020ccd16d8f25fc54325e66cffe48f4f208ef2344f4c560b",
+      "after_sha256": "6c238431416d8ffef28bf74be669f6142b9c910d8b8e5031660d5281bc201b68"
+    },
+    "tools/shell_calls.py": {
+      "before_sha256": "1e62ee581c37dad13c389276f1179e9b0ec625a18e6eaf753715707369f5691f",
+      "after_sha256": "92348d037d47729ba57aec4dbee7abcca86bab8f64ff74b5532a0723b4a494a7"
+    },
+    "modes/catalog.py": {
+      "before_sha256": "199132a081b02c07a4f8ebd406809bd0fc5d3480dc1cbef1802472f53abd9d03",
+      "after_sha256": "fa03690334f4613cfee25a703e713fecbae60adebe8524ebdddd28e7966c5898"
+    },
+    "evaluation/swe_bench/worker.py": {
+      "before_sha256": "5507e5fe834a67260bd530e86f66607b464b02aafa1bdb0161f9908205765136",
+      "after_sha256": "dbb9df8e23be94d27d9cc22fe17a12120bb3f04575aaa47d5bf521194c5a928e"
+    },
+    "evaluation/swe_bench/jobs.py": {
+      "before_sha256": "5b5b8af0311c8244d95c45285821667db85a00a67a82c6148e1718f8e34ce68d",
+      "after_sha256": "dc62682b479def7cd9890386adf830f6076fcf09527fdba8047784dc9bb855f5"
+    },
+    "api/swe_bench.py": {
+      "before_sha256": "ba6c1f676f9b79c7db1f0c22ca43ae99ca28c931312952ede600a29a7b97a52a",
+      "after_sha256": "2fa2b1fa753783a63be08810c8cf738841b65265a604c241ef65af1239350332"
+    },
+    "api/diagnostics.py": {
+      "before_sha256": "ff7b41ebfd076e96194d8b1a627eedfe57f1adbefa589c5a31c8487dfa462b0d",
+      "after_sha256": "a40b3c2b9c94a7d3675b439c7e6f8591b223ef933e3bee732a8ff3a3eea7adf9"
+    }
+  }
+}

@@ -5,8 +5,128 @@ import threading
 
 import pytest
 
+from backend.tools.base import ToolResult
 from test.support.tooling import call
-from tools.base import ToolResult
+
+
+async def test_separate_sessions_cannot_overlap_tools_in_one_workspace(tmp_path, setup_tools):
+    from backend.tools.executor import ToolExecutor
+
+    one, output, _, _ = setup_tools
+    entered, release = asyncio.Event(), asyncio.Event()
+    second_entered = asyncio.Event()
+
+    async def first_approval(request):
+        entered.set()
+        await release.wait()
+        return True
+
+    async def second_approval(request):
+        second_entered.set()
+        return True
+
+    one.approve = first_approval
+    two = ToolExecutor(tmp_path, output, second_approval)
+    first = asyncio.create_task(
+        one.execute_batch([call("WriteFile", {"path": "one", "content": "1"}, "a")])
+    )
+    await entered.wait()
+    second = asyncio.create_task(
+        two.execute_batch([call("WriteFile", {"path": "two", "content": "2"}, "b")])
+    )
+    try:
+        await asyncio.sleep(0.04)
+        assert not second_entered.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(first, second)
+    assert (tmp_path / "one").read_text() == "1"
+    assert (tmp_path / "two").read_text() == "2"
+
+
+async def test_error_after_file_effect_pauses_following_tools(tmp_path, setup_tools, monkeypatch):
+    from backend.tools import file_operations
+
+    executor, *_ = setup_tools
+
+    def fail(path):
+        raise OSError("directory sync failed after replacement")
+
+    monkeypatch.setattr(file_operations, "sync_directory", fail)
+    results = await executor.execute_batch(
+        [
+            call("WriteFile", {"path": "effect", "content": "written"}, "one"),
+            call("WriteFile", {"path": "must-not-run", "content": "no"}, "two"),
+        ]
+    )
+    assert (tmp_path / "effect").read_text() == "written"
+    assert results[0].status == "unknown"
+    assert results[1].status == "cancelled"
+    assert not (tmp_path / "must-not-run").exists()
+
+
+async def test_unknown_effect_blocks_other_session_until_durable_reconciliation(
+    tmp_path, monkeypatch
+):
+    from backend.conversation.store import SessionStore
+    from backend.execution.gate import execution_gate
+    from backend.storage.output_store import OutputStore
+    from backend.tools import file_operations
+    from backend.tools.executor import ToolExecutor
+
+    async def approve(request):
+        return True
+
+    store = SessionStore(tmp_path, "owner")
+    one = ToolExecutor(tmp_path, OutputStore(store), approve, store.append)
+    two = ToolExecutor(tmp_path, OutputStore(SessionStore(tmp_path, "other")), approve)
+    original = file_operations.sync_directory
+
+    def fail(path):
+        raise OSError("after effect")
+
+    monkeypatch.setattr(file_operations, "sync_directory", fail)
+    result = await one.execute_batch(
+        [call("WriteFile", {"path": "effect", "content": "yes"}, "one")]
+    )
+    assert result[0].status == "unknown"
+    monkeypatch.setattr(file_operations, "sync_directory", original)
+    blocked = await two.execute_batch(
+        [call("WriteFile", {"path": "blocked", "content": "no"}, "two")]
+    )
+    assert blocked[0].status == "cancelled"
+    assert "未确认" in blocked[0].content
+    assert not (tmp_path / "blocked").exists()
+    unknown = next(e for e in store.events if e["type"] == "tool_result")
+    async with execution_gate(reconciliation=True) as lease:
+        store.append(
+            "operation_reconciled",
+            result_seq=unknown["seq"],
+            call_id="one",
+            resolution="succeeded",
+            evidence="checked file and processes",
+            processes_stopped=True,
+        )
+        lease.clear_for(store, unknown)
+    two.reset_turn()
+    result = await two.execute_batch(
+        [call("WriteFile", {"path": "allowed", "content": "ok"}, "three")]
+    )
+    assert result[0].status == "succeeded"
+
+
+async def test_result_commit_before_marker_cleanup_does_not_block_forever(tmp_path):
+    from backend.conversation.store import SessionStore
+    from backend.execution.gate import execution_gate
+
+    store = SessionStore(tmp_path)
+    store.append("tool_running", call_id="one", name="WriteFile")
+    async with execution_gate() as lease:
+        lease.before_effect(store, "one")
+        store.append("tool_result", call_id="one", status="succeeded", content="done")
+        # Simulate a crash before marker removal.
+    async with execution_gate() as lease:
+        assert lease.pending() is None
 
 
 @pytest.mark.asyncio

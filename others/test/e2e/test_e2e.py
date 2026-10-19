@@ -2,20 +2,21 @@
 
 import asyncio
 import json
-import shutil
+import os
 
 import pytest
 
-from agent.loop import AgentLoop
-from config import Config
-from context import ContextManager
-from conversation.projection import project_messages
-from conversation.provider import Response
-from conversation.resume import recover_session
-from memory.long_memory import LongMemory
-from memory.output_store import OutputStore
-from memory.session_store import SessionStore
-from tools.executor import ToolExecutor
+from backend.config import Config
+from backend.context import ContextManager
+from backend.conversation.projection import project_messages
+from backend.conversation.resume import recover_session
+from backend.conversation.store import SessionStore
+from backend.execution.codex import CodexSandbox
+from backend.long_memory.manager import LongMemory
+from backend.runtime.loop import AgentLoop
+from backend.runtime.provider import Response
+from backend.storage.output_store import OutputStore
+from backend.tools.executor import ToolExecutor
 
 
 def call(id, name, **arguments):
@@ -53,10 +54,15 @@ class ScriptedProvider:
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Shell execution requires a verified Windows sandbox")
+@pytest.mark.skipif(
+    os.name == "nt", reason="POSIX E2E fixture; Windows requires native platform CI"
+)
 async def test_real_tools_persist_complete_restore_without_replay(tmp_path):
-    if not (shutil.which("pwsh") or shutil.which("powershell")):
-        pytest.skip("Integration requires installed PowerShell")
+    app_root = tmp_path / "application"
+    app_root.mkdir()
+    sandbox = CodexSandbox(app_root, lambda: (tmp_path,))
+    if not await sandbox.verify():
+        pytest.skip(sandbox.reason)
     (tmp_path / "a.txt").write_text("old value", encoding="utf-8")
     (tmp_path / "b.txt").write_text("obsolete", encoding="utf-8")
     config = Config(
@@ -81,14 +87,21 @@ async def test_real_tools_persist_complete_restore_without_replay(tmp_path):
         call(
             "shell",
             "Shell",
-            command="if ((Get-Content 'a.txt' -Raw) -ne 'new value') { exit 9 }; Add-Content -Path 'runs.txt' -Value 'once'; Write-Output ('Z' * 20000)",
+            command="test \"$(cat a.txt)\" = 'new value' || exit 9; printf 'once\\n' >> runs.txt; head -c 20000 /dev/zero | tr '\\0' Z",
             timeout=120,
         ),
         call("delete-b", "DeleteFile", path="b.txt"),
+        call(
+            "verify-final",
+            "Shell",
+            command="test \"$(cat a.txt)\" = 'new value' && test ! -e b.txt",
+            purpose="verification",
+        ),
     ]
     provider = ScriptedProvider(config, calls)
     memory = LongMemory(tmp_path, provider)
     executor = ToolExecutor(tmp_path, outputs, approve, emit)
+    executor.shell_backend = sandbox
     loop = AgentLoop(
         config, store, provider, executor, ContextManager(config, provider, store), memory
     )
@@ -100,8 +113,13 @@ async def test_real_tools_persist_complete_restore_without_replay(tmp_path):
         assert (tmp_path / "a.txt").read_text() == "new value"
         assert not (tmp_path / "b.txt").exists()
         assert (tmp_path / "runs.txt").read_text().splitlines() == ["once"]
-        assert [request["name"] for request in approvals] == ["Shell", "DeleteFile"]
-        assert str(tmp_path) in approvals[0]["description"]
+        assert [request["name"] for request in approvals] == [
+            "EditFile",
+            "Shell",
+            "DeleteFile",
+            "Shell",
+        ]
+        assert str(tmp_path) in approvals[1]["description"]
 
         first_result = next(i for i, (kind, _) in enumerate(trace) if kind == "tool_result")
         assert {
@@ -110,8 +128,13 @@ async def test_real_tools_persist_complete_restore_without_replay(tmp_path):
         results = [e for e in store.events if e["type"] == "tool_result"]
         assert len(results) == len(calls)
         assert all(e["status"] == "succeeded" for e in results)
-        assert [e["call_id"] for e in results[2:]] == ["edit-a", "shell", "delete-b"]
-        assert store.meta["token_total"] == 33
+        assert [e["call_id"] for e in results[2:]] == [
+            "edit-a",
+            "shell",
+            "delete-b",
+            "verify-final",
+        ]
+        assert store.meta["token_total"] == 44
         assert not store.meta["usage_incomplete"]
         assert store.meta["usage_by_purpose"]["memory"]["tokens"] == 11
 
@@ -146,7 +169,7 @@ async def test_real_tools_persist_complete_restore_without_replay(tmp_path):
         )
         assert await resumed.run("Continue") == "completed"
         await asyncio.sleep(0)
-        assert len(approvals) == 2
+        assert len(approvals) == 4
         assert (tmp_path / "runs.txt").read_text().splitlines() == ["once"]
         assert len([e for e in restored.events if e["type"] == "tool_result"]) == len(calls)
     finally:

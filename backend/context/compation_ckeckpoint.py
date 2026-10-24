@@ -14,7 +14,7 @@ def digest(messages):
     ).hexdigest()
 
 
-class ContextCheckpoint:
+class CompactionCheckpoint:
     def __init__(self, store):
         self.store = store
         self.record = next(

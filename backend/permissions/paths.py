@@ -122,7 +122,8 @@ class PathPolicy:
         )
 
     def files(
-        self, *, max_depth=None, include_dirs=False, stop=None, deadline=None, max_entries=10000
+        self, *, max_depth=None, include_dirs=False, stop=None, deadline=None, max_entries=10000,
+        skip_dirs=(),
     ):
         """Yield safe entries with a bounded walk; depth 1 means direct children only."""
         seen = set()
@@ -154,7 +155,7 @@ class PathPolicy:
                             if include_dirs and resolved not in seen:
                                 seen.add(resolved)
                                 yield resolved
-                            if max_depth is None or depth + 1 < max_depth:
+                            if name not in skip_dirs and (max_depth is None or depth + 1 < max_depth):
                                 kept.append(name)
                     except (ToolError, OSError):
                         pass

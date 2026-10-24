@@ -24,6 +24,11 @@ def completion_check(events, turn_id):
         and event.get("status") == "succeeded"
     ]
     checks = [event for event in events if event["type"] == "verification_result"]
+    readbacks = [
+        event
+        for event in events
+        if event["type"] == "file_verification_result" and event.get("status") == "passed"
+    ]
     write = writes[-1] if writes else None
     check = checks[-1] if checks else None
     reason = "no_file_mutation"
@@ -36,11 +41,36 @@ def completion_check(events, turn_id):
             reason = "verification_failed"
         else:
             reason = "fresh_verification"
+        if reason in {"verification_missing", "verification_stale"} and all(
+            (
+                check is not None
+                and check.get("status") == "passed"
+                and check["seq"] > mutation["seq"]
+            )
+            or any(
+                readback["seq"] > mutation["seq"]
+                and {
+                    "call_id": mutation.get("call_id"),
+                    "request_id": mutation.get("request_id"),
+                }
+                in readback.get("mutations", [])
+                for readback in readbacks
+            )
+            for mutation in writes
+        ):
+            reason = "combined_verification" if check is not None else "text_readback_verified"
+            check = readbacks[-1]
     return {
         "version": VERSION,
         "scope": "file_tool_mutations",
         "required": bool(write),
-        "accepted": reason in {"no_file_mutation", "fresh_verification"},
+        "accepted": reason
+        in {
+            "no_file_mutation",
+            "fresh_verification",
+            "text_readback_verified",
+            "combined_verification",
+        },
         "reason": reason,
         "last_mutation_seq": write["seq"] if write else None,
         "verification_seq": check["seq"] if check else None,
@@ -55,3 +85,43 @@ def feedback(check):
         "若验证失败先修复；不要通过改变预期或打印成功来满足核对。"
         "无法验证时说明具体阻碍，不宣称测试通过。"
     )
+
+
+class CompletionReview:
+    """Track verification retries and the one contract review for a turn."""
+
+    def __init__(self, store, turn_id):
+        self.store, self.turn_id = store, turn_id
+        self.feedback = ""
+        self.rechecks = 0
+        self.review_requested = False
+
+    @property
+    def exhausted(self):
+        return self.rechecks > MAX_RECHECKS
+
+    def evaluate(self, request_id, message_id):
+        check = completion_check(self.store.view, self.turn_id)
+        if not check["required"]:
+            return False
+        review = (
+            check["reason"] in {"fresh_verification", "combined_verification"}
+            and not self.review_requested
+        )
+        blocked = not check["accepted"] or review
+        self.store.append(
+            "completion_check",
+            request_id=request_id,
+            message_id=message_id,
+            status="review_requested" if review else "blocked" if blocked else "accepted",
+            review_requested=review,
+            **check,
+        )
+        if review:
+            self.review_requested = True
+            self.feedback = CONTRACT_REVIEW
+        else:
+            self.feedback = feedback(check) if blocked else ""
+        if not check["accepted"]:
+            self.rechecks += 1
+        return blocked

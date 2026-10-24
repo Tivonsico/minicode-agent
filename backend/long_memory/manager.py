@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from backend.conversation.store import atomic_json, internal_directory
+from backend.storage.files import atomic_json, internal_directory
 
 from .background import BackgroundTasks
 from .extractor import extract
@@ -39,9 +39,16 @@ class LongMemory:
         self._background = BackgroundTasks()
         self._pending = {}
 
-    def _save(self):
+    def _commit(self, candidate):
+        """Publish only confirmed state; a failed atomic save remains retryable.
+
+        If replacement succeeded but the final directory sync failed, the disk
+        outcome is uncertain. A restart reloads the surviving atomic file;
+        this process keeps its last confirmed state until an explicit retry.
+        """
         internal_directory(self.root, "long_memory")
-        atomic_json(self.path, self._data)
+        atomic_json(self.path, candidate)
+        self._data = candidate
 
     def entries(self):
         return copy.deepcopy(list(self._data["entries"].values()))
@@ -60,30 +67,32 @@ class LongMemory:
         )
 
     def delete(self, entry_id):
-        for key, entry in self._data["entries"].items():
+        candidate = copy.deepcopy(self._data)
+        for key, entry in candidate["entries"].items():
             if entry["id"] == entry_id:
-                self._data["generation"] += 1
-                self._data["tombstones"][key] = self._data["generation"]
-                del self._data["entries"][key]
-                self._save()
+                candidate["generation"] += 1
+                candidate["tombstones"][key] = candidate["generation"]
+                del candidate["entries"][key]
+                self._commit(candidate)
                 return True
         return False
 
     def edit(self, entry_id, content, version):
-        for key, entry in self._data["entries"].items():
+        candidate = copy.deepcopy(self._data)
+        for key, entry in candidate["entries"].items():
             if entry["id"] != entry_id:
                 continue
             if entry["version"] != version:
                 raise ValueError("记忆已被修改，请刷新后再保存")
-            self._data["generation"] += 1
-            self._data["tombstones"][key] = self._data["generation"]
+            candidate["generation"] += 1
+            candidate["tombstones"][key] = candidate["generation"]
             entry.update(
                 content=content,
                 version=version + 1,
                 edited_at=datetime.now(timezone.utc).isoformat(),
                 source_kind="user_edit",
             )
-            self._save()
+            self._commit(candidate)
             return copy.deepcopy(entry)
         raise KeyError("记忆不存在")
 
@@ -102,8 +111,9 @@ class LongMemory:
             "source_time": datetime.now(timezone.utc).isoformat(),
             "source_kind": "user",
         }
-        self._data["entries"][key] = entry
-        self._save()
+        candidate = copy.deepcopy(self._data)
+        candidate["entries"][key] = entry
+        self._commit(candidate)
         return copy.deepcopy(entry)
 
     def schedule(self, store, turn_id, user_messages, *, scope="legacy"):
@@ -130,27 +140,28 @@ class LongMemory:
             candidates = await extract(self.provider, store, messages) if messages else []
             # No await during merge/save: background commits and deletion serialize
             # on the application's event loop, merging against the latest state.
-            committed_sources = set(self._data["sources"])
+            candidate = copy.deepcopy(self._data)
+            committed_sources = set(candidate["sources"])
             for item in candidates:
                 if store.session_id + ":" + item["source_message"] in committed_sources:
                     continue
                 item["scope"] = scope
                 key = item["key"] if scope == "legacy" else scope + "::" + item["key"]
-                if self._data["tombstones"].get(key, -1) > generation:
+                if candidate["tombstones"].get(key, -1) > generation:
                     continue
-                existing = self._data["entries"].get(key)
+                existing = candidate["entries"].get(key)
                 if existing and source_order(existing["source_time"]) >= source_order(
                     item["source_time"]
                 ):
                     continue
                 item["id"] = existing["id"] if existing else uuid.uuid4().hex
                 item["version"] = (existing.get("version", 0) if existing else 0) + 1
-                self._data["entries"][key] = item
-            self._data["completed"].append(identity)
-            self._data["sources"] = sorted(
-                set(self._data["sources"]) | {store.session_id + ":" + m["id"] for m in messages}
+                candidate["entries"][key] = item
+            candidate["completed"].append(identity)
+            candidate["sources"] = sorted(
+                set(candidate["sources"]) | {store.session_id + ":" + m["id"] for m in messages}
             )
-            self._save()
+            self._commit(candidate)
             store.append("memory_complete", source_turn=identity)
         except Exception:
             store.append(

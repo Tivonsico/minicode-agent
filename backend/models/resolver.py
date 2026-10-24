@@ -12,18 +12,26 @@ from .metadata import from_endpoint
 
 
 def resolve_config(config, *, transport=None, refresh=False):
-    # Explicit limits are available to embedded callers and offline tests,
-    # never loaded from CONTEXT_WINDOW in the environment.
+    # Embedded callers may supply an already-resolved configuration. Normal
+    # startup never loads token limits from environment variables.
     if config.context_window:
         return config
     cache = CapabilityCache(config)
     capabilities = None if refresh else cache.read()
-    if capabilities is None:
+    if capabilities is None or capabilities.max_output is None:
         with httpx.Client(transport=transport, follow_redirects=False) as client:
             capabilities = from_endpoint(config, client)
-            if capabilities is None:
+            if capabilities is None or capabilities.max_output is None:
                 try:
-                    capabilities = from_catalog(config, client)
+                    catalog = from_catalog(config, client)
+                    if capabilities is None:
+                        capabilities = catalog
+                    elif catalog is not None and catalog.max_output is not None:
+                        capabilities = replace(
+                            capabilities,
+                            max_output=catalog.max_output,
+                            source=capabilities.source + ";output=" + catalog.source,
+                        )
                 except (httpx.HTTPError, ValueError):
                     pass
         if capabilities is None:
@@ -33,13 +41,14 @@ def resolve_config(config, *, transport=None, refresh=False):
                 "自定义网关可设置 MODEL_CATALOG_PROVIDER 指定目录中的服务商；"
                 "未收录的模型需要服务端提供 context_window/context_length。"
             )
-        cache.write(capabilities)
-    # Output reserve is an application policy, not a claimed model maximum.
-    output = config.max_output_tokens or min(16_384, capabilities.context_window // 4)
-    if capabilities.max_output is not None and output > capabilities.max_output:
-        if config.max_output_tokens:
-            raise ConfigError("MAX_OUTPUT_TOKENS 超过解析出的模型输出上限。")
-        output = capabilities.max_output
+        if capabilities.max_output is not None:
+            cache.write(capabilities)
+    if capabilities.max_output is None:
+        raise ConfigError(
+            "无法确认该模型的最大输出 token 上限：模型元数据未声明 max_output_tokens/"
+            "max_completion_tokens，匹配的模型目录也未提供有效输出上限；不使用人工默认值。"
+        )
+    output = capabilities.max_output
     return replace(
         config,
         context_window=capabilities.context_window,

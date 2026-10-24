@@ -12,11 +12,12 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from backend.context.project_assets import ProjectAssets
-from backend.conversation.store import atomic_json, internal_directory, now
+from backend.conversation.metadata import now
 from backend.models.reasoning import validate
 from backend.modes.catalog import tags
 from backend.modes.settings import ModeSettings
 from backend.observability.inputs import digest, redact
+from backend.storage.files import atomic_json, internal_directory
 
 from .attempt import execute, export_patch, prepare
 from .catalog import Catalog

@@ -141,21 +141,11 @@ async def test_sync_running_state_cancel_and_stale_edit(tmp_path):
         base = f"/api/sessions/{item.store.session_id}"
         item.start("等待模型")
         await until(lambda: provider.calls == 1)
-        snapshot = (await connection.post(base + "/checkpoints/sync")).json()
-        assert snapshot["source"] == "manual" and snapshot["state"]["status"] == "running"
-        assert snapshot["covered_seq"] == snapshot["seq"] - 1
+        assert (await connection.post(base + "/checkpoints/sync")).status_code == 404
+        assert (await connection.put(base + "/checkpoint-state", json={})).status_code == 404
         data = (await connection.get(base + "/diagnostics")).json()
-        edit = {
-            "expected_seq": data["state_revision"],
-            "objective": "人工目标",
-            "notes": "检查",
-            "next_step": "继续",
-            "status": "completed",
-        }
-        assert (await connection.put(base + "/checkpoint-state", json=edit)).status_code == 409
-        edit["status"] = "running"
-        assert (await connection.put(base + "/checkpoint-state", json=edit)).status_code == 200
-        assert (await connection.put(base + "/checkpoint-state", json=edit)).status_code == 409
+        assert "state" not in data and "checkpoints" not in data
+        assert not any(e["type"] in {"checkpoint", "task_state"} for e in item.store.events)
         assert (
             await connection.post(
                 "/api/evaluations/runs", json={"session_ids": [item.store.session_id]}

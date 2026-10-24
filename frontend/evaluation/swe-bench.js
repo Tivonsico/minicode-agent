@@ -1,6 +1,7 @@
 import { request, post } from "../api.js";
 import { element } from "../messages.js";
 import { $, disclosure, download, time } from "../inspection/shared.js";
+import { attachRunConversation, renderRunConversation } from "./conversation.js";
 
 const labels = {
   preparing: "准备仓库",
@@ -20,6 +21,9 @@ const labels = {
 
 export function sweBench(safely) {
   let tasks = [],
+    jobs = [],
+    selectedTask = null,
+    taskVersion = 0,
     chosen = new Set(),
     currentDataset = "",
     active = null,
@@ -32,6 +36,41 @@ export function sweBench(safely) {
     tasks.filter(
       (t) => !$("case-filter").value || t.repo === $("case-filter").value,
     );
+
+  async function showTask(task) {
+    if (!task) { $("swe-task-detail").replaceChildren(); return; }
+    selectedTask = task;
+    const version = ++taskVersion;
+    const detail = $("swe-task-detail");
+    detail.replaceChildren(element("h3", task.instance_id));
+    const host = element("section");
+    detail.append(host);
+    const attempts = jobs.flatMap(job => job.results.map((result, index) => ({ job, result, index })))
+      .filter(entry => entry.result.instance_id === task.instance_id);
+    if (!attempts.length) {
+      renderRunConversation(host, { task, official: true });
+      return;
+    }
+    const select = element("select");
+    select.setAttribute("aria-label", "官方任务运行记录");
+    attempts.forEach((entry, number) => {
+      const option = element("option", `${time(entry.job.created_at)} · ${labels[entry.result.status] || entry.result.status}${entry.job.execution_reused ? " · 仅重新验收" : ""}`);
+      option.value = number;
+      select.append(option);
+    });
+    detail.insertBefore(select, host);
+    let selection = 0;
+    async function showRun() {
+      const ticket = ++selection;
+      const entry = attempts[Number(select.value)];
+      host.textContent = "读取本次运行的原始问答…";
+      const trace = await request(`${endpoint}/jobs/${entry.job.id}/attempts/${entry.result.artifact_index ?? entry.index}/trace`);
+      if (version !== taskVersion || ticket !== selection || !visible) return;
+      renderRunConversation(host, { task, result: entry.result, events: trace.events || [], official: true });
+    }
+    select.onchange = () => safely(showRun);
+    await showRun();
+  }
 
   function counts() {
     $("swe-count").textContent = `已选 ${chosen.size} 项（每次最多 10 项）`;
@@ -59,15 +98,7 @@ export function sweBench(safely) {
         element("span", task.instance_id),
         element("small", task.repo),
       );
-      button.onclick = () => {
-        $("swe-task-detail").replaceChildren(
-          disclosure(
-            "公开 Issue · " + task.instance_id,
-            task.problem_statement,
-          ),
-          element("p", `初始版本：${task.base_commit}`, "subtle"),
-        );
-      };
+      button.onclick = () => safely(() => showTask(task));
       row.append(check, button);
       list.append(row);
     }
@@ -194,12 +225,16 @@ export function sweBench(safely) {
         actions.append(button);
       }
       details.append(actions);
+      const task = tasks.find(task => task.instance_id === row.instance_id) || row;
+      attachRunConversation(details,
+        () => request(`${endpoint}/jobs/${job.id}/attempts/${row.artifact_index}/trace`),
+        { task, result: row, official: true }, safely);
       report.append(details);
     }
   }
 
   async function loadJobs() {
-    const jobs = await request(endpoint + "/jobs");
+    jobs = await request(endpoint + "/jobs");
     const list = $("swe-reports");
     list.replaceChildren();
     for (const job of jobs) {
@@ -215,6 +250,10 @@ export function sweBench(safely) {
       list.append(button);
     }
     if (jobs.length) renderReport(jobs[0]);
+    const available = filtered();
+    const task = available.find(task => task.instance_id === selectedTask?.instance_id) ||
+      available.find(task => jobs.some(job => job.results.some(row => row.instance_id === task.instance_id))) || available[0];
+    if (visible) await showTask(task);
     const running = jobs.find((job) => job.status === "running");
     active = running?.id || null;
     $("swe-cancel").hidden = !active;
@@ -344,10 +383,12 @@ export function sweBench(safely) {
     filter: () => {
       chosen.clear();
       renderTasks();
+      safely(() => showTask(filtered()[0]));
     },
     close: () => {
       visible = false;
       generation++;
+      taskVersion++;
       clearTimeout(timer);
     },
   };

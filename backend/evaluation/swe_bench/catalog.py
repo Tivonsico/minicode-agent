@@ -5,9 +5,9 @@ import json
 import shutil
 import uuid
 
-from backend.conversation.store import atomic_json
 from backend.execution.process import capture
 from backend.observability.inputs import digest
+from backend.storage.files import atomic_json
 
 from .environment import DATASETS, SOURCE
 

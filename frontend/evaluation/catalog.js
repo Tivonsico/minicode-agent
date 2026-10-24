@@ -2,6 +2,8 @@
 export const frameworks = [
   { id: "local", name: "本地会话规则" },
   { id: "swe_bench", name: "SWE-bench 官方规则" },
+  { id: "compaction", name: "长任务压缩" },
+  { id: "recovery", name: "中断幂等重试" },
 ];
 
 export const categories = {

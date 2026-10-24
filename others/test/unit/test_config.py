@@ -20,10 +20,13 @@ def test_env_exact_model_and_secret_repr(tmp_path, monkeypatch):
     config = load_config(tmp_path)
     assert config.model == "GLM-5.3-Flash"
     assert config.context_window == 0  # Legacy environment windows are ignored.
+    assert config.max_output_tokens == 0  # Limits come from model metadata, not .env.
     assert config.api_key == "test-private-key"
     assert "test-private-key" not in repr(config)
     monkeypatch.setenv("MODEL", "explicit-override")
+    monkeypatch.setenv("MAX_OUTPUT_TOKENS", "not-a-token-limit")
     assert load_config(tmp_path).model == "explicit-override"
+    assert load_config(tmp_path).max_output_tokens == 0
 
 
 def test_url_rejects_credentials_and_full_endpoint(tmp_path):

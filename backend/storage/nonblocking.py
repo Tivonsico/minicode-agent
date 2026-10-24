@@ -24,19 +24,6 @@ def io_method(function):
     return call
 
 
-def checkpoint_io(function):
-    @wraps(function)
-    def call(self, *args, **kwargs):
-        database = getattr(self.store, "database", None)
-        if database is None:
-            return function(self, *args, **kwargs)
-        def locked():
-            with self.store._lock:
-                return function(self, *args, **kwargs)
-        return database.run_io(locked)
-    return call
-
-
 async def portal(store):
     if getattr(store, "database", None):
         await greenback.ensure_portal()

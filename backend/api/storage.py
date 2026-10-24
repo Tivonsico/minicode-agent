@@ -54,8 +54,10 @@ def storage_router(service):
         if any(item.busy() for item in service.sessions.values()):
             raise HTTPException(409, "请先停止所有任务，再保存存储配置")
         config = await asyncio.to_thread(check, body)
+        owners = (tuple(item.store.owner for item in service.sessions.values())
+                  if service.database else ())
         await asyncio.to_thread(ensure_mode_switch_safe, config, service.database,
-                                tuple(item.store.owner for item in service.sessions.values()))
+                                owners)
         save_settings(config)
         return await asyncio.to_thread(status, service)
 

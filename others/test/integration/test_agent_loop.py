@@ -21,10 +21,10 @@ class FakeMemory:
     def __init__(self):
         self.scheduled = []
 
-    def snapshot(self):
+    def snapshot(self, scope=None):
         return []
 
-    def schedule(self, *args):
+    def schedule(self, *args, **kwargs):
         self.scheduled.append(args)
 
 
@@ -283,7 +283,7 @@ async def test_text_with_tool_calls_runs_tools_then_final(tmp_path):
     assert store.meta["token_total"] == 30 and len(memory.scheduled) == 1
 
 
-async def test_request_limit_counts_actual_attempts(tmp_path):
+async def test_long_turn_keeps_counting_attempts_past_thirty(tmp_path):
     class Retrying:
         attempts = 0
 
@@ -291,14 +291,16 @@ async def test_request_limit_counts_actual_attempts(tmp_path):
             for i in range(1, 4):
                 await on_attempt(i)
                 self.attempts += 1
+            if self.attempts == 36:
+                return Response("done", [], "stop", None)
             return tool_response(str(self.attempts))
 
     provider = Retrying()
     loop, store, memory = make_loop(tmp_path, provider)
-    assert await loop.run("keep working") == "paused"
-    assert provider.attempts == 30
-    assert len([e for e in store.events if e["type"] == "request_start"]) == 30
-    assert not memory.scheduled
+    assert await loop.run("keep working") == "completed"
+    assert provider.attempts == loop.requests == 36
+    assert len([e for e in store.events if e["type"] == "request_start"]) == 36
+    assert len(memory.scheduled) == 1
 
 
 async def test_cancel_preserves_partial_and_never_dispatches_tools(tmp_path):
@@ -360,3 +362,82 @@ async def test_disconnected_partial_is_saved_and_paused(tmp_path):
     assert await loop.run("work") == "paused"
     assert store.events[-1]["status"] == "paused"
     assert not memory.scheduled and not loop.executor.calls
+
+
+async def test_current_directory_state_overrides_old_missing_grant_reply(tmp_path):
+    app_root, work = tmp_path / "app", tmp_path / "work"
+    app_root.mkdir()
+    work.mkdir()
+    provider = ScriptedProvider([Response("已找到", [], "stop", None)])
+    loop, store, _ = make_loop(app_root, provider)
+    store.append("message", message_id="old", role="assistant", content="没有授权任何工作目录")
+    grants = SessionPermissions(app_root, store)
+    grants.add(str(work))
+
+    async def approve(_):
+        return True
+
+    loop.executor = ToolExecutor(app_root, OutputStore(store), approve, session_permissions=grants)
+    assert await loop.run("现在读取文件") == "completed"
+    system = provider.messages[0][0]["content"]
+    assert system.rfind("Current authorized work directories") > system.rfind("项目提示词")
+    assert "优先于历史回复" in system
+    assert str(work) in system
+
+
+async def test_many_stream_chunks_keep_exact_text_without_per_token_commits(tmp_path):
+    class TokenProvider:
+        async def complete(self, messages, tools, on_delta, on_attempt):
+            await on_attempt(1)
+            for _ in range(1000):
+                await on_delta({"type": "text", "content": "字"})
+            return Response("字" * 1000, [], "stop", None)
+
+    loop, store, _ = make_loop(tmp_path, TokenProvider())
+    assert await loop.run("流式输出") == "completed"
+    deltas = [e for e in store.events if e["type"] == "assistant_delta"]
+    assert "".join(e["content"] for e in deltas) == "字" * 1000
+    assert len(deltas) < 100
+    end = next(e for e in store.events if e["type"] == "request_end")
+    assert all(e["seq"] < end["seq"] for e in deltas)
+
+
+async def test_reused_tool_id_in_a_later_request_keeps_its_own_result(tmp_path):
+    class DifferentResults(FakeExecutor):
+        async def execute_batch(self, calls):
+            self.calls.extend(calls)
+            return [
+                ToolResult(c["id"], "ReadFile", "succeeded", f"result-{len(self.calls)}")
+                for c in calls
+            ]
+
+    provider = ScriptedProvider(
+        [tool_response("reused"), tool_response("reused"), Response("done", [], "stop", None)]
+    )
+    loop, store, _ = make_loop(tmp_path, provider, DifferentResults())
+    assert await loop.run("read twice") == "completed"
+    results = [m for m in provider.messages[-1] if m["role"] == "tool"]
+    assert [m["content"] for m in results] == ["result-1", "result-2"]
+    recorded = [e for e in store.events if e["type"] == "tool_result"]
+    assert len({e["request_id"] for e in recorded}) == 2
+
+
+async def test_runtime_session_uses_messages_without_duplicate_task_state(tmp_path):
+    from types import SimpleNamespace
+
+    from backend.runtime.session import RuntimeSession
+
+    provider = ScriptedProvider([Response("done", [], "stop", None), Response("done", [], "stop", None)])
+    session = RuntimeSession(
+        Config(tmp_path, "test-key", context_window=100000, max_output_tokens=1000),
+        "stateprojection", provider, FakeMemory(),
+        SimpleNamespace(executable="/bin/false", available=lambda: False, reason="test"),
+    )
+    for task in ["修复登录", "继续检查过期行为"]:
+        session.start(task)
+        await session.task
+        assert session.loop.status == "completed"
+        assert any(m.get("content") == task for m in provider.messages[-1])
+        assert all('"runtime_state"' not in m.get("content", "") for m in provider.messages[-1])
+        assert not any(e["type"] in {"checkpoint", "task_state"} for e in session.store.events)
+    assert session.loop.status == "completed"

@@ -15,3 +15,14 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Local experiment data, conversation traces, and generated evidence.
+/docs/research/compaction-reproduction-20261022/
+/docs/research/interruption-recovery-20261023/
+/docs/research/evaluation-all-conversations-20261024/
+/docs/research/evaluation-experiment-migration-20261024/
+/docs/research/evaluation-experiment-recaps-20261024/
+/docs/research/minicode-context-costs-20261021.json
+/docs/harness/swe-bench-30-task-review.json
+/docs/harness/swe-bench-30-task-review.md
+/others/harness/compaction_study/data.json

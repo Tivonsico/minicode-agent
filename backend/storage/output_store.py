@@ -8,7 +8,8 @@ import re
 import uuid
 from pathlib import Path
 
-from backend.conversation.store import SessionStore, internal_directory, sync_directory
+from backend.conversation.store import SessionStore
+from backend.storage.files import internal_directory, sync_directory
 
 
 class OutputStore:

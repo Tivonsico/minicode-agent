@@ -14,12 +14,16 @@ from .events import event_response
 from .models import ApprovalInput, DirectoryInput, MessageInput, PromptInput, SkillInput
 from .modes import mode_router
 from .nonblocking import Router
+from .snapshots import snapshot_router
 from .storage import storage_router
 from .swe_bench import swe_bench_router
 
 
 def router(service):
+    from backend.evaluation.recovery_study import recovery_study_router
+
     api = Router(prefix="/api")
+    api.include_router(recovery_study_router(service))
     api.include_router(swe_bench_router(service))
     api.include_router(storage_router(service))
 
@@ -46,7 +50,9 @@ def router(service):
 
     @api.get("/sessions")
     async def sessions():
-        return service.list_sessions()
+        archived = service.experiments.session_ids()
+        return [{**entry, "recovery_study": service.recovery_study.metadata(entry['session_id'])}
+                for entry in service.list_sessions() if entry['session_id'] not in archived]
 
     @api.post("/sessions", status_code=201)
     async def create():
@@ -54,12 +60,13 @@ def router(service):
 
     @api.get("/sessions/{sid}")
     async def detail(sid: str):
-        return session(sid).detail()
+        return {**session(sid).detail(), "recovery_study": service.recovery_study.metadata(sid)}
 
     @api.post("/sessions/{sid}/runs", status_code=202)
     async def run(sid: str, body: MessageInput):
         if not body.text.strip():
             raise HTTPException(422, "请输入任务")
+        service.recovery_study.ensure_live(sid)
         return {"run_id": session(sid).start(body.text, body.reasoning_effort, body.agent_mode)}
 
     @api.post("/sessions/{sid}/cancel")
@@ -149,6 +156,7 @@ def router(service):
         assets.save_prompt(path, body.content)
         return {"saved": True}
 
+    api.include_router(snapshot_router(service, session))
     api.include_router(diagnostics_router(service, session))
     api.include_router(evaluation_router(service, session))
     api.include_router(asset_router(service, session, idle))

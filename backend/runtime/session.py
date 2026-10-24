@@ -4,7 +4,6 @@ import asyncio
 import copy
 import uuid
 
-from backend.checkpoint import Checkpoints
 from backend.context import ContextManager
 from backend.context.budget import input_budget
 from backend.conversation.operations import unresolved_operations
@@ -18,12 +17,12 @@ from backend.modes.catalog import validate as validate_mode
 from backend.modes.settings import ModeSettings
 from backend.observability.scope import scope
 from backend.permissions.directories import SessionPermissions
+from backend.snapshots.session import SessionSnapshots
 from backend.storage.output_store import OutputStore
 from backend.tools.executor import ToolExecutor
 
 from .approvals import ApprovalBroker
 from .loop import AgentLoop
-from .verification import MUTATIONS
 
 
 class RuntimeSession:
@@ -31,10 +30,9 @@ class RuntimeSession:
         self.config = config
         self.store = store or SessionStore(config.root, session_id, secrets=(config.api_key,))
         recover_session(self.store)
-        self.checkpoints = Checkpoints(self.store)
         self.changed = asyncio.Event()
         self.permissions = SessionPermissions(config.root, self.store)
-        self.approvals = ApprovalBroker(self.publish, self.checkpoints)
+        self.approvals = ApprovalBroker(self.publish, self.store)
         self.output = OutputStore(self.store, secrets=self.store.secrets)
         self.executor = ToolExecutor(
             config.root,
@@ -42,6 +40,7 @@ class RuntimeSession:
             self.approvals.ask,
             self.publish,
             session_permissions=self.permissions,
+            history_recall=config.experimental_history_recall,
         )
         if unresolved_operations(self.store.view):
             self.executor.terminal_failed = True
@@ -64,7 +63,6 @@ class RuntimeSession:
             self.memory,
             on_event=self.observe,
             skill_context=lambda: self.selected_skill,
-            checkpoints=self.checkpoints,
         )
         self._starting = False
         self.task = None
@@ -76,21 +74,10 @@ class RuntimeSession:
         )
         self.mode_settings = ModeSettings(config.root)
         self.run_profile = None
+        self.file_snapshots = SessionSnapshots(self)
 
     def publish(self, kind, **data):
         event = self.store.append(kind, **data)
-        if kind == "verification_result":
-            self.checkpoints.update(verification_status=data["status"])
-        elif (
-            kind == "tool_result"
-            and data.get("name") in MUTATIONS
-            and data.get("status") == "succeeded"
-        ):
-            self.checkpoints.update(
-                verification_status="stale"
-                if self.checkpoints.snapshot()["verification_status"] != "not_run"
-                else "not_run"
-            )
         self.changed.set()
         return event
 
@@ -102,7 +89,9 @@ class RuntimeSession:
             self.publish(kind, **data)
 
     def busy(self):
-        return self._starting or (self.task is not None and not self.task.done())
+        return (self._starting or getattr(self, "_restoring_files", False)
+                or getattr(self, "_recovering_operations", False)
+                or (self.task is not None and not self.task.done()))
 
     def select_mode(self, mode):
         validate_mode(mode)
@@ -130,6 +119,7 @@ class RuntimeSession:
         self.executor.mode_profile = profile
         self.run_id = uuid.uuid4().hex
         self.turn_id = uuid.uuid4().hex
+        self.file_snapshots.entered = False
         self._starting = True
         try:
             self.publish(
@@ -146,7 +136,6 @@ class RuntimeSession:
             # was cancelled. Close the accepted lifecycle without dispatching.
             self.publish("run_end", run_id=self.run_id, turn_id=self.turn_id,
                          status="interrupted", reason="cancelled_before_dispatch")
-            self.checkpoints.capture(run_id=self.run_id, turn_id=self.turn_id)
             raise
         finally:
             self._starting = False
@@ -170,13 +159,16 @@ class RuntimeSession:
 
     async def _run(self, text):
         try:
-            await self.loop.run(text)
+            await self.file_snapshots.run(lambda: self.loop.run(text))
         except Exception as exc:
             self.loop.status = "failed"
             # Do not expose provider credentials or arbitrary exception content to a client.
             try:
                 if self.loop.conversation.active:
                     self.loop._finish("failed", "runtime_error")
+                else:
+                    self.publish("run_end", run_id=self.run_id, turn_id=self.turn_id,
+                                 status="failed", reason="snapshot_or_runtime_error")
                 self.publish(
                     "notice", text=f"执行失败：{type(exc).__name__}；请检查本地状态后继续。"
                 )
@@ -184,22 +176,21 @@ class RuntimeSession:
                 pass
         finally:
             self.selected_skill = ""
+            self.publish("file_snapshots_ready", run_id=self.run_id, turn_id=self.turn_id)
             self.changed.set()
 
     async def cancel(self):
-        if self.busy():
+        if self.task is not None and not self.task.done():
             self.task.cancel()
             try:
                 await self.task
             except asyncio.CancelledError:
+                if not self.file_snapshots.entered:
+                    self.loop.status = "interrupted"
+                    async def no_effect():
+                        pass
+                    await self.file_snapshots.run(no_effect)
                 # Cancellation before the coroutine starts has no dispatched side effect.
-                self.checkpoints.update(
-                    status="interrupted",
-                    pending_tool=None,
-                    phase="ended",
-                    turn_id=self.turn_id,
-                    **tags(self.run_profile or {}),
-                )
                 self.publish(
                     "run_end",
                     run_id=self.run_id,
@@ -208,7 +199,7 @@ class RuntimeSession:
                     reason="cancelled_before_start",
                     **tags(self.run_profile or {}),
                 )
-                self.checkpoints.capture(run_id=self.run_id, turn_id=self.turn_id)
+                self.publish("file_snapshots_ready", run_id=self.run_id, turn_id=self.turn_id)
                 self.changed.set()
 
     def detail(self):
@@ -216,7 +207,6 @@ class RuntimeSession:
             "session": self.store.meta,
             "messages": self.loop.conversation.messages(),
             "events": self.store.view,
-            "state": self.checkpoints.snapshot(),
             "recovery": self.store.recovery_info,
             "unresolved_operations": unresolved_operations(self.store.view),
             "running": self.busy(),

@@ -2,10 +2,22 @@
 
 from backend.permissions.policy import Action
 
-from . import mutation_calls, read_calls, search_calls, shell_calls, skill_calls
+from . import (
+    gmail_calls,
+    history_calls,
+    mutation_calls,
+    read_calls,
+    search_calls,
+    shell_calls,
+    skill_calls,
+)
 from .base import ToolError, ToolResult
 
 HANDLERS = {
+    "RecallHistory": history_calls.execute,
+    "GmailPrepareEmail": gmail_calls.execute,
+    "GmailSendEmail": gmail_calls.execute,
+    "GmailEmailStatus": gmail_calls.execute,
     "UseSkill": skill_calls.execute,
     "ReadSkillResource": skill_calls.execute,
     "ReadFile": read_calls.execute,
@@ -31,7 +43,11 @@ class ToolDispatch:
         )
         if decision.action == Action.DENY:
             raise ToolError("Operation denied by permission policy.", "permission")
-        content = await HANDLERS[name](self, name, cid, args)
+        if name == "S2Effect":
+            from backend.recovery.effects import execute
+            content = await execute(self, cid, args)
+        else:
+            content = await HANDLERS[name](self, name, cid, args)
         if isinstance(content, ToolResult):
             return content
         limit = 70000 if name in {"UseSkill", "ReadSkillResource"} else 16000

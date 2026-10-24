@@ -4,6 +4,7 @@ import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import httpx
 
@@ -53,6 +54,40 @@ class Provider:
         self.config = config
         self.transport = transport
         self.retry_delay = retry_delay
+
+    async def count_tokens(self, messages, tools):
+        """Ask BigModel's tokenizer for this exact model, messages and tools.
+
+        None means no supported counting endpoint; it is never a token count.
+        A supported endpoint failing must stop preparation rather than silently
+        changing the units used by the compaction threshold.
+        """
+        endpoint = urlparse(self.config.base_url)
+        if not (
+            endpoint.hostname == "open.bigmodel.cn"
+            and endpoint.path.rstrip("/") == "/api/paas/v4"
+            and self.config.model.casefold().startswith("glm-")
+        ):
+            return None
+        payload = {"model": self.config.model, "messages": messages}
+        if tools:
+            payload["tools"] = tools
+        try:
+            async with httpx.AsyncClient(
+                transport=self.transport, timeout=self.config.request_timeout
+            ) as client:
+                response = await client.post(
+                    self.config.base_url.rstrip("/") + "/tokenizer",
+                    json=payload,
+                    headers={"Authorization": "Bearer " + self.config.api_key},
+                )
+                response.raise_for_status()
+                count = response.json()["usage"]["prompt_tokens"]
+                if type(count) is not int or count < 0:
+                    raise ValueError("Invalid token count")
+                return count
+        except (httpx.HTTPError, ValueError, TypeError, KeyError):
+            raise ProviderError("模型服务 token 计数失败；未使用字节估算替代真实计数。") from None
 
     async def complete(
         self,

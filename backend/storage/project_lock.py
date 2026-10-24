@@ -6,7 +6,7 @@ from pathlib import Path
 
 import psutil
 
-from backend.conversation.store import internal_directory
+from backend.storage.files import internal_directory
 
 
 class ProjectLock:

@@ -4,7 +4,7 @@ import hashlib
 import json
 
 VERSION = 1
-REDUCER_VERSION = 2
+REDUCER_VERSION = 5
 PAIRS = (
     ("turn_start", "turn_end", "turn_id"),
     ("request_start", "request_end", "request_id"),
@@ -28,6 +28,14 @@ def identity(event, key):
     return event.get(key)
 
 
+def discarded_message_ids(events):
+    return {
+        e.get("message_id") for e in events
+        if e["type"] in {"request_recovery", "completion_deferred"}
+        or (e["type"] == "completion_check" and e.get("status") in {"blocked", "review_requested"})
+    }
+
+
 def recovery_seed(events):
     selected = {}
     active_turns = set()
@@ -46,7 +54,7 @@ def recovery_seed(events):
                     ) == identity(event, key):
                         selected[candidate["seq"]] = candidate
     complete = {e.get("message_id") for e in events if e["type"] == "message"}
-    discarded = {e.get("message_id") for e in events if e["type"] == "request_recovery"}
+    discarded = discarded_message_ids(events)
     partials = {}
     for event in events:
         if (
@@ -73,10 +81,14 @@ def runtime_view(events):
         "message",
         "tool_result",
         "operation_reconciled",
+        "business_intent_approved",
         "directory_authorized",
         "directory_revoked",
         "directory_selected",
         "output_saved",
+        "file_snapshot_completed",
+        "completion_check",
+        "completion_deferred",
     }
     latest = {}
     # Retain the original creation boundary even when its event type is compacted.
@@ -86,7 +98,7 @@ def runtime_view(events):
         kind = e["type"]
         if kind in ("assistant_delta", "tool_delta"):
             continue
-        if kind in ("context_compressed", "mode_selected", "checkpoint", "task_state"):
+        if kind in ("context_compressed", "mode_selected"):
             latest[kind] = e
         elif kind == "usage":
             latest[(kind, e.get("request_id"))] = e

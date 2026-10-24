@@ -221,7 +221,7 @@ h1 {
   padding: 14px calc((100% - var(--content-width)) / 2) 28px;
   scroll-behavior: smooth;
 }
-/* Empty sessions invite input above; active conversations scroll above the composer. */
+/* Empty sessions center the invitation; active conversations scroll above the composer. */
 .conversation-stage {
   flex: 1;
   min-height: 0;
@@ -229,7 +229,9 @@ h1 {
   flex-direction: column;
 }
 main[data-empty="true"] .conversation-stage {
-  padding-top: clamp(24px, 9dvh, 90px);
+  justify-content: safe center;
+  padding-block: 24px;
+  overflow-y: auto;
 }
 main[data-empty="true"] #messages,
 main[data-empty="false"] .conversation-heading {
@@ -1004,7 +1006,7 @@ body.sidebar-open #sidebar-toggle {
     font-size: 22px;
   }
   main[data-empty="true"] .conversation-stage {
-    padding-top: clamp(18px, 5dvh, 40px);
+    padding-block: 18px;
   }
   .composer-caption {
     font-size: 9px;
@@ -1068,7 +1070,7 @@ select {
 }
 @media (max-height: 600px) {
   main[data-empty="true"] .conversation-stage {
-    padding-top: 12px;
+    padding-block: 12px;
   }
   .conversation-heading {
     margin-bottom: 10px;
@@ -1084,16 +1086,6 @@ select {
   gap: 12px;
   margin: 0 0 10px;
   padding: 0 16px;
-}
-.composer-mode select {
-  margin: 0;
-  width: auto;
-  max-width: 70%;
-  border: 0;
-  background: transparent;
-  padding: 3px 28px 3px 0;
-  font-size: 12px;
-  color: var(--muted);
 }
 .composer-mode .text-button {
   font-size: 12px;
@@ -1186,11 +1178,11 @@ select {
 }
 
 .composer-mode { flex-wrap: wrap; gap: 8px 12px; }
-.persistence-modes { display: inline-flex; gap: 7px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 11px; }
-.persistence-modes .text-button { font-size: 11px; white-space: nowrap; }
-#local-mode-help { color: var(--text); }
+.composer-mode .text-button { white-space: nowrap; }
 #persistence-dialog { width: min(600px, calc(100vw - 32px)); }
 #persistence-description p { line-height: 1.8; }
+#persistence-dialog > .dialog-actions { flex-wrap: nowrap; }
+#persistence-dialog > .dialog-actions button { white-space: nowrap; min-width: 0; }
 .reconciliation-form { margin: 14px 0; padding: 15px; border: 1px solid var(--line); border-radius: 10px; }
 .reconciliation-form label { display: block; margin: 10px 0; }
 .reconciliation-form textarea, .reconciliation-form select { width: 100%; }
@@ -1200,8 +1192,52 @@ select {
 .storage-form input, .storage-form select { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: 6px; background: white; font: inherit; }
 .storage-form .stopped-confirmation { display: flex; align-items: start; }
 .storage-form input[type=checkbox] { width: auto; margin-top: 3px; }
+.storage-settings-form { display: block; margin-top: 0; }
+.storage-mysql-fields { display: grid; gap: 12px; margin: 18px 0; }
 @media (min-width: 480px) {
+  .storage-mysql-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .storage-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .storage-form > p, .storage-form > .dialog-actions, .storage-form > label:first-child,
   .storage-form > .stopped-confirmation, .storage-form > button { grid-column: 1 / -1; }
+}
+@media (max-width: 400px) {
+  #persistence-dialog > .dialog-actions { gap: 6px; }
+  #persistence-dialog > .dialog-actions button { padding-inline: 8px; font-size: 11px; }
+}
+
+/* File history uses the conversation's existing type, surfaces and alignment. */
+#snapshots-open { margin-left: auto; margin-right: 32px; white-space: nowrap; }
+.change-counts { display: inline-flex; gap: 8px; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.lines-added { color: #16803c; }
+.lines-deleted { color: #c53636; }
+.snapshot-inline { display: flex; align-items: center; gap: 10px; }
+.snapshot-chip { border-color: var(--line); font-size: 12px; padding: 7px 10px; gap: 16px; }
+.snapshot-dialog { width: min(900px, calc(100vw - 32px)); max-height: 86dvh; overflow-y: auto; }
+.snapshot-heading, .snapshot-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.snapshot-heading h2 { margin: 0; }
+.snapshot-note { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.snapshot-project { overflow-wrap: anywhere; }
+.snapshot-select { width: 100%; margin-block: 6px 12px; }
+.snapshot-summary { justify-content: flex-start; padding: 8px 0 12px; }
+.snapshot-files { border-block: 1px solid var(--line); margin-top: 12px; }
+.snapshot-file + .snapshot-file { border-top: 1px solid var(--line); }
+.snapshot-file > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px 4px; }
+.snapshot-file > summary::before { content: "›"; width: 10px; color: var(--muted); flex-shrink: 0; }
+.snapshot-file[open] > summary::before { transform: rotate(90deg); }
+.snapshot-path { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.snapshot-file small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.snapshot-patch { margin: 0 0 12px; max-height: 440px; overflow: auto; padding: 10px 0; background: #fafafa; white-space: pre; overflow-wrap: normal; }
+.snapshot-patch > span { display: block; min-width: max-content; padding-inline: 12px; line-height: 1.7; white-space: pre; }
+.snapshot-patch .diff-add { color: #116b32; background: #e9f7ed; }
+.snapshot-patch .diff-delete { color: #a82929; background: #fdecec; }
+.snapshot-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.snapshot-confirm { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; line-height: 1.7; overflow-wrap: anywhere; }
+.snapshot-confirm[hidden] { display: none; }
+.snapshot-confirm input { width: auto; margin-top: 4px; }
+.snapshot-file > summary:focus-visible, .snapshot-chip:focus-visible { outline: 2px solid #777980; outline-offset: 3px; }
+@media (max-width: 720px) {
+  #snapshots-open { margin-right: 28px; padding-inline: 4px; font-size: 11px; }
+  .snapshot-dialog { padding: 18px; }
+  .snapshot-file > summary { gap: 8px; }
+  .snapshot-actions button { flex: 1 1 auto; }
 }

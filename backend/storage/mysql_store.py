@@ -1,13 +1,12 @@
 """MySQL event store using the same runtime projections as the local journal."""
 from __future__ import annotations
 
-import copy
 import json
 import threading
 import uuid
 from pathlib import Path
 
-from backend.checkpoint.manager import empty_state, reduce_state
+from backend.conversation.metadata import now, project_meta
 from backend.conversation.snapshot import (
     REDUCER_VERSION,
     VERSION,
@@ -16,8 +15,9 @@ from backend.conversation.snapshot import (
     recovery_seed,
     runtime_view,
 )
-from backend.conversation.store import SessionStore, internal_directory, now
 from backend.observability.scope import current
+from backend.storage.files import internal_directory
+from backend.storage.redaction import redact
 
 from .mysql import encoded
 from .nonblocking import io_method
@@ -28,7 +28,8 @@ def operation_id(session_id, event):
 
 
 class MySQLSessionStore:
-    _redact = SessionStore._redact
+    def _redact(self, value):
+        return redact(value, self.secrets)
 
     def __init__(self, database, root, session_id=None, secrets=()):
         self.database = database
@@ -45,36 +46,36 @@ class MySQLSessionStore:
         self.claim = None
         self._events_cache = None
         self._tail, self._seed, self.view = [], [], []
-        self.restored_checkpoint = None
         self.seq = 0
         self.recovery_info = {"source": "mysql", "covered_seq": 0, "loaded_records": 0}
+        # Legacy non-null state column is inert; do not reduce or read task progress.
         if session_id is None:
-            meta = SessionStore.project_meta([], self.session_id)
+            meta = project_meta([], self.session_id)
             database.transaction(lambda c: c.execute(
                 "INSERT INTO mc_sessions(id,meta,state) VALUES (%s,%s,%s)",
-                (self.session_id, encoded(meta), encoded(empty_state()))))
+                (self.session_id, encoded(meta), encoded({}))))
         self._load()
 
     @io_method
     def _load(self):
-        # Consistent read: checkpoint, suffix and session projection share one read view.
+        # Consistent read: snapshot, suffix and session projection share one read view.
         with self.database.connection() as connection:
             connection.begin()
             try:
                 with connection.cursor() as cursor:
-                    cursor.execute("SELECT seq,meta,state FROM mc_sessions WHERE id=%s",
+                    cursor.execute("SELECT seq,meta FROM mc_sessions WHERE id=%s",
                                    (self.session_id,))
                     row = cursor.fetchone()
                     if row is None:
                         raise KeyError("会话不存在")
-                    self.meta, self.state = json.loads(row["meta"]), json.loads(row["state"])
-                    cursor.execute("SELECT body FROM mc_checkpoints WHERE session_id=%s",
+                    self.meta = json.loads(row["meta"])
+                    cursor.execute("SELECT body FROM mc_journal_snapshots WHERE session_id=%s",
                                    (self.session_id,))
-                    checkpoint = cursor.fetchone()
+                    snapshot = cursor.fetchone()
                     covered = 0
-                    if checkpoint:
+                    if snapshot:
                         try:
-                            wrapper = json.loads(checkpoint["body"])
+                            wrapper = json.loads(snapshot["body"])
                             saved = wrapper["data"]
                             covered = saved["covered_seq"]
                             cursor.execute("SELECT body FROM mc_events WHERE session_id=%s AND seq=%s",
@@ -85,15 +86,13 @@ class MySQLSessionStore:
                                 or saved["reducer_version"] != REDUCER_VERSION
                                 or saved["session_id"] != self.session_id
                                 or not 0 < covered <= row["seq"]
-                                or not boundary or json.loads(boundary["body"]) != saved["checkpoint"]
-                                or saved["checkpoint"]["type"] != "checkpoint"
+                                or not boundary or json.loads(boundary["body"]) != saved["boundary_event"]
                                 or not isinstance(saved["view"], list)
                                 or not isinstance(saved["recovery_seed"], list)):
-                                raise ValueError("Invalid checkpoint")
+                                raise ValueError("Invalid journal snapshot")
                             self.view = saved["view"]
                             self._seed = saved["recovery_seed"]
-                            self.restored_checkpoint = saved["checkpoint"]
-                            self.recovery_info.update(source="checkpoint", covered_seq=covered)
+                            self.recovery_info.update(source="journal_snapshot", covered_seq=covered)
                         except (ValueError, KeyError, TypeError):
                             covered = 0
                     cursor.execute("SELECT body FROM mc_events WHERE session_id=%s AND seq>%s ORDER BY seq",
@@ -147,31 +146,28 @@ class MySQLSessionStore:
                 intent = next(e for e in reversed(self.view) if e["type"] == "tool_start"
                               and identity(e, "call_id") == identity(event, "call_id"))
                 event.update(input=intent["input"], intent_seq=intent["seq"])
-            state = reduce_state(copy.deepcopy(self.state), event)
-            meta = SessionStore.project_meta(self.view + [event], self.session_id)
+            meta = project_meta(self.view + [event], self.session_id)
             def write(cursor):
                 self._row(cursor)
                 self._operation(cursor, event)
                 cursor.execute("INSERT INTO mc_events VALUES (%s,%s,%s,%s)",
                                (self.session_id, event["seq"], event_id, encoded(event)))
-                cursor.execute("UPDATE mc_sessions SET seq=%s,meta=%s,state=%s WHERE id=%s",
-                               (event["seq"], encoded(meta), encoded(state), self.session_id))
-                if event_type == "checkpoint":
-                    saved = {"schema_version": VERSION, "reducer_version": REDUCER_VERSION,
-                             "session_id": self.session_id, "covered_seq": event["seq"],
-                             "checkpoint": event, "view": runtime_view(self.view + [event]),
-                             "recovery_seed": recovery_seed(self.recovery_view + [event])}
-                    cursor.execute("INSERT INTO mc_checkpoints VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE covered_seq=VALUES(covered_seq),body=VALUES(body)",
-                                   (self.session_id, event["seq"], encoded({"data": saved, "digest": digest(saved)})))
+                cursor.execute("UPDATE mc_sessions SET seq=%s,meta=%s WHERE id=%s",
+                               (event["seq"], encoded(meta), self.session_id))
                 return event
             try:
                 event = self.database.transaction(write, command_id=event_id)
             except (OSError, ValueError):
                 self.failed = True
                 raise
-            self.seq, self.meta, self.state = event["seq"], meta, state
+            self.seq, self.meta = event["seq"], meta
             self.view.append(event)
             self._tail.append(event)
+            if event_type in {"run_end", "context_compressed"}:
+                try:
+                    self.save_snapshot()
+                except (OSError, ValueError):
+                    pass  # The authoritative event transaction has already committed.
             return event
 
     def _operation(self, cursor, event):
@@ -209,10 +205,19 @@ class MySQLSessionStore:
                         encoded(event)))
 
     @io_method
-    def save_checkpoint(self, record):
-        # Already atomically committed with the checkpoint event and state.
-        if self.failed or record["seq"] != self.seq:
-            raise OSError("Invalid checkpoint boundary")
+    def save_snapshot(self):
+        """Optional journal acceleration; contains no independent task state."""
+        if self.failed or not self.seq:
+            return
+        saved = {"schema_version": VERSION, "reducer_version": REDUCER_VERSION,
+                 "session_id": self.session_id, "covered_seq": self.seq,
+                 "boundary_event": self.view[-1], "view": runtime_view(self.view),
+                 "recovery_seed": recovery_seed(self.recovery_view)}
+        def write(cursor):
+            self._row(cursor)
+            cursor.execute("INSERT INTO mc_journal_snapshots VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE covered_seq=VALUES(covered_seq),body=VALUES(body)",
+                           (self.session_id, self.seq, encoded({"data": saved, "digest": digest(saved)})))
+        self.database.transaction(write)
 
     @io_method
     def acquire_owner(self):
@@ -226,7 +231,6 @@ class MySQLSessionStore:
         self.owner = self.database.transaction(claim)
         # Reads before claiming may be stale. Reload only after exclusive ownership.
         self._tail, self._seed, self.view = [], [], []
-        self.restored_checkpoint = None
         self.recovery_info = {"source": "mysql", "covered_seq": 0, "loaded_records": 0}
         self._load()
         self.failed = False

@@ -120,3 +120,60 @@ async def test_project_scope_isolation_retrieval_and_deletion(tmp_path):
     assert "Use Python" not in restored.snapshot("/project/a")
     assert "Use Go" in restored.snapshot("/project/b")
     await memory.close()
+
+
+async def test_failed_memory_save_can_retry_without_losing_the_source(tmp_path, monkeypatch):
+    from backend.long_memory import manager
+
+    provider, store = Provider(), Store()
+    memory = LongMemory(tmp_path, provider)
+    save = manager.atomic_json
+
+    def unavailable(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(manager, "atomic_json", unavailable)
+    messages = source("retry", "Use Python", "2026-01-01")
+    await memory.schedule(store, "retry", messages)
+    assert memory.entries() == []
+    assert any(event["type"] == "memory_error" for event in store.events)
+
+    monkeypatch.setattr(manager, "atomic_json", save)
+    retry = memory.schedule(store, "retry", messages)
+    assert retry is not None
+    await retry
+    assert LongMemory(tmp_path, provider).entries()[0]["content"] == "Use Python"
+    assert memory.schedule(store, "retry", messages) is None
+
+
+@pytest.mark.parametrize("operation", ["add", "edit", "delete"])
+async def test_failed_manual_memory_change_preserves_confirmed_state(
+    tmp_path, monkeypatch, operation
+):
+    from backend.long_memory import manager
+
+    memory = LongMemory(tmp_path, Provider())
+    entry = memory.add("Use Python", "/project", "session")
+    before = memory.entries()
+    save = manager.atomic_json
+
+    def unavailable(*args):
+        raise OSError("disk full")
+
+    def change():
+        if operation == "add":
+            return memory.add("Run tests", "/project", "session")
+        if operation == "edit":
+            return memory.edit(entry["id"], "Use Go", entry["version"])
+        return memory.delete(entry["id"])
+
+    monkeypatch.setattr(manager, "atomic_json", unavailable)
+    with pytest.raises(OSError):
+        change()
+    assert memory.entries() == before
+    assert LongMemory(tmp_path, Provider()).entries() == before
+
+    monkeypatch.setattr(manager, "atomic_json", save)
+    change()
+    assert memory.entries() != before
+    assert LongMemory(tmp_path, Provider()).entries() == memory.entries()

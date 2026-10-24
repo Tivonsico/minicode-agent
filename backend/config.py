@@ -35,6 +35,7 @@ class Config:
     mysql_password: str = field(default="", repr=False)
     mysql_ssl_ca: str = ""
     mysql_pool_size: int = 8
+    experimental_history_recall: bool = False
 
     def __post_init__(self):
         object.__setattr__(self, "root", Path(self.root).resolve())
@@ -81,18 +82,16 @@ def load_config(root: Path | str | None = None, env_file: Path | None = None) ->
     values = {**dotenv_values(env_file or root / ".env"),
               **{ENVIRONMENT[key]: value for key, value in saved.items()}, **os.environ}
     try:
-        output = int(values.get("MAX_OUTPUT_TOKENS") or 0)
         timeout = float(values.get("REQUEST_TIMEOUT") or 120)
         mysql_port = int(values.get("MINICODE_MYSQL_PORT") or 3306)
         mysql_pool_size = int(values.get("MINICODE_MYSQL_POOL_SIZE") or 8)
     except (ValueError, TypeError):
-        raise ConfigError("MAX_OUTPUT_TOKENS、REQUEST_TIMEOUT、MySQL 端口和连接数必须为数值。") from None
+        raise ConfigError("REQUEST_TIMEOUT、MySQL 端口和连接数必须为数值。") from None
     return Config(
         root=root,
         api_key=values.get("OPENAI_API_KEY") or "",
         base_url=values.get("OPENAI_BASE_URL") or "https://api.openai.com/v1",
         model=values.get("MODEL") or "",
-        max_output_tokens=output,
         shell=values.get("SHELL_EXECUTABLE")
         or ("powershell.exe" if os.name == "nt" else "/bin/sh"),
         request_timeout=timeout,

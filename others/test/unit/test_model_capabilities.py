@@ -10,6 +10,7 @@ from backend.context.budget import input_budget
 from backend.models import resolve_config
 from backend.models.cache import TTL, CapabilityCache
 from backend.models.catalog import CATALOG_URL
+from backend.runtime.provider import Provider
 
 
 def config(root, **kwargs):
@@ -54,7 +55,8 @@ def test_list_endpoint_supported_and_exact_id_required(tmp_path):
                 json={
                     "data": [
                         {"id": "custom-model-next", "context_window": 1000000},
-                        {"id": "custom-model", "context_length": 64000},
+                        {"id": "custom-model", "context_length": 64000,
+                         "max_completion_tokens": 16000},
                     ]
                 },
             )
@@ -62,7 +64,7 @@ def test_list_endpoint_supported_and_exact_id_required(tmp_path):
 
     result = resolve_config(config(tmp_path), transport=httpx.MockTransport(handler))
     assert result.context_window == 64000
-    assert result.model_max_output is None
+    assert result.model_max_output == 16000
 
 
 def test_catalog_fallback_does_not_receive_api_key(tmp_path):
@@ -76,7 +78,35 @@ def test_catalog_fallback_does_not_receive_api_key(tmp_path):
     resolved = resolve_config(config(tmp_path), transport=httpx.MockTransport(handler))
     assert resolved.context_window == 128000
     assert resolved.capability_source == "models.dev:openai"
-    assert resolved.max_output_tokens == 16384
+    assert resolved.max_output_tokens == 32000
+
+
+def test_missing_endpoint_output_is_filled_from_matching_catalog(tmp_path):
+    def handler(request):
+        if str(request.url) == CATALOG_URL:
+            return httpx.Response(200, json=catalog())
+        return httpx.Response(200, json={"id": "custom-model", "context_window": 64000})
+
+    resolved = resolve_config(config(tmp_path), transport=httpx.MockTransport(handler))
+    assert resolved.context_window == 64000
+    assert resolved.max_output_tokens == 32000
+    assert input_budget(resolved) == 32000
+
+
+def test_endpoint_list_supplies_output_missing_from_detail_before_catalog(tmp_path):
+    def handler(request):
+        assert str(request.url) != CATALOG_URL
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": [{
+                "id": "custom-model", "context_window": 128000,
+                "max_output_tokens": 32000, "max_input_tokens": 100000,
+            }]})
+        return httpx.Response(200, json={"id": "custom-model", "context_window": 64000})
+
+    resolved = resolve_config(config(tmp_path), transport=httpx.MockTransport(handler))
+    assert resolved.context_window == 64000
+    assert resolved.max_output_tokens == 32000
+    assert resolved.model_max_input == 100000
 
 
 @pytest.mark.parametrize("model", ["custom", "custom-model-2026-10-08", "unknown"])
@@ -174,7 +204,8 @@ def test_cache_ttl_identity_refresh_and_no_secret(tmp_path):
 
     def handler(request):
         calls.append(request)
-        return httpx.Response(200, json={"id": cfg.model, "context_window": 128000})
+        return httpx.Response(200, json={"id": cfg.model, "context_window": 128000,
+                                         "max_output_tokens": 32000})
 
     transport = httpx.MockTransport(handler)
     first = resolve_config(cfg, transport=transport)
@@ -196,20 +227,63 @@ def test_cache_ttl_identity_refresh_and_no_secret(tmp_path):
     assert len(calls) == 4
 
 
-def test_explicit_output_budget_validated_against_model(tmp_path):
+@pytest.mark.parametrize("previous_budget", [4000, 16000])
+def test_model_output_limit_replaces_previous_application_budget(tmp_path, previous_budget):
     def handler(request):
         return httpx.Response(
             200, json={"id": "custom-model", "context_window": 64000, "max_output_tokens": 8000}
         )
 
-    with pytest.raises(ConfigError, match="输出上限"):
-        resolve_config(
-            config(tmp_path, max_output_tokens=16000), transport=httpx.MockTransport(handler)
-        )
     result = resolve_config(
-        config(tmp_path, max_output_tokens=4000), transport=httpx.MockTransport(handler)
+        config(tmp_path, max_output_tokens=previous_budget), transport=httpx.MockTransport(handler)
     )
-    assert result.max_output_tokens == 4000
+    assert result.max_output_tokens == 8000
+
+
+def test_missing_output_limit_does_not_invent_a_budget(tmp_path):
+    def handler(request):
+        if str(request.url) == CATALOG_URL:
+            return httpx.Response(200, json={})
+        return httpx.Response(200, json={"id": "custom-model", "context_window": 64000})
+
+    with pytest.raises(ConfigError, match="最大输出"):
+        resolve_config(config(tmp_path), transport=httpx.MockTransport(handler))
+    assert not CapabilityCache(config(tmp_path)).path.exists()
+
+
+async def test_declared_limits_reach_actual_request_and_input_budget(tmp_path):
+    model = "GLM-5.3-Flash"
+
+    def handler(request):
+        if request.url.path.endswith("/chat/completions"):
+            payload = json.loads(request.content)
+            assert payload["max_tokens"] == 131072
+            assert payload["reasoning_effort"] == "max"
+            return httpx.Response(200, text=(
+                'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n'
+                'data: [DONE]\n\n'
+            ))
+        return httpx.Response(200, json={
+            "id": model, "context_window": 1000000, "max_output_tokens": 131072,
+            "max_input_tokens": 850000,
+        })
+
+    transport = httpx.MockTransport(handler)
+    resolved = resolve_config(
+        replace(config(tmp_path, base_url="https://vendor.test/v4"), model=model),
+        transport=transport,
+    )
+    assert resolved.context_window == 1000000
+    assert resolved.model_max_input == 850000
+    assert input_budget(resolved) == 850000
+
+    async def ignore_delta(event):
+        pass
+
+    response = await Provider(resolved, transport=transport).complete(
+        [{"role": "user", "content": "hello"}], [], ignore_delta
+    )
+    assert response.content == "ok"
 
 
 def test_network_failure_does_not_invent_window_and_valid_cache_works_offline(tmp_path):
@@ -224,7 +298,7 @@ def test_network_failure_does_not_invent_window_and_valid_cache_works_offline(tm
     online = httpx.MockTransport(
         lambda request: httpx.Response(
             200,
-            json={"id": cfg.model, "context_window": 64000},
+            json={"id": cfg.model, "context_window": 64000, "max_output_tokens": 8000},
         )
     )
     expected = resolve_config(cfg, transport=online)

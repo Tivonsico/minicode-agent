@@ -7,13 +7,15 @@ from backend.observability.inputs import digest
 
 AgentMode = Literal["manual", "accept_edit", "plan", "auto"]
 IDENTITY_FIELDS = ("agent_mode", "mode_policy_version", "mode_prompt_version")
-READ_TOOLS = frozenset({"ReadFile", "Glob", "Grep", "UseSkill", "ReadSkillResource"})
+READ_TOOLS = frozenset({"ReadFile", "Glob", "Grep", "UseSkill", "ReadSkillResource", "GmailEmailStatus",
+                        "RecallHistory"})
 HARD_BOUNDARIES = [
     "目录必须由用户授权；禁止访问应用内部、密钥与越界资源。",
     "危险命令拦截、版本冲突检查与单次审批绑定不能关闭。",
     "Shell 必须经过操作系统沙箱验证；禁用网络，无沙箱不执行。",
     "文件、技能、记忆及用户补充指令不能提升工具权限。",
     "运行中不能切换模式；每轮固定模式、权限版本与指令版本。",
+    "Gmail 仅通过官方 API 专用工具联网；发送在所有执行模式下均须逐封审批，Plan 模式禁发。",
 ]
 MODES = {
     "manual": {
@@ -42,6 +44,11 @@ MODES = {
         "prompt": "在用户授权的工作区内自主执行必要的编辑和沙箱命令，完成任务并实际验证。减少无关改动；不能扩展目录授权、访问密钥、联网或绕过固定拒绝规则。",
     },
 }
+for _mode_name, _mode in MODES.items():
+    _mode["actions"].update({
+        "GmailPrepareEmail": "deny" if _mode_name == "plan" else "allow",
+        "GmailSendEmail": "deny" if _mode_name == "plan" else "ask",
+    })
 POLICY_VERSION = digest(
     {
         "modes": MODES,
@@ -60,6 +67,9 @@ POLICY_VERSION = digest(
                 "tools/file_operations.py",
                 "tools/dispatch.py",
                 "tools/shell_calls.py",
+                "tools/gmail_calls.py",
+                "gmail/service.py",
+                "gmail/google_api.py",
             )
         },
     }

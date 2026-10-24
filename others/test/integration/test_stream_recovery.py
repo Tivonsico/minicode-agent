@@ -73,15 +73,19 @@ async def test_partial_stream_recovery_is_bounded(tmp_path):
     assert len([e for e in store.events if e["type"] == "request_recovery"]) == 1
 
 
-async def test_partial_stream_cannot_bypass_request_ceiling(tmp_path):
+async def test_partial_stream_can_recover_after_thirty_requests(tmp_path):
     class BudgetProvider(DroppedProvider):
         async def complete(self, messages, tools, on_delta, on_attempt):
+            if self.calls:
+                await on_attempt(1)
+                return Response("done", [], "stop", None)
+            self.calls += 1
             for _ in range(30):
                 await on_attempt(1)
             await on_delta({"type": "text", "content": "partial"})
             raise ProviderError("drop", received_output=True, retryable=True)
 
     loop, store, _ = make_loop(tmp_path, BudgetProvider())
-    assert await loop.run("inspect") == "paused"
-    assert loop.requests == 30
-    assert not any(e["type"] == "request_recovery" for e in store.events)
+    assert await loop.run("inspect") == "completed"
+    assert loop.requests == 31
+    assert len([e for e in store.events if e["type"] == "request_recovery"]) == 1

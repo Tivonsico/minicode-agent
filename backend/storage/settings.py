@@ -4,7 +4,7 @@ import os
 import uuid
 from dataclasses import replace
 
-from backend.conversation.store import internal_directory, sync_directory
+from backend.storage.files import internal_directory, sync_directory
 
 FIELDS = ("storage_mode", "mysql_host", "mysql_port", "mysql_database", "mysql_user",
           "mysql_password", "mysql_ssl_ca", "mysql_pool_size")
@@ -93,5 +93,5 @@ def ensure_mode_switch_safe(config, database=None, allowed_owners=()):
 
 
 def record_active_mode(config):
-    from backend.conversation.store import atomic_json
+    from backend.storage.files import atomic_json
     atomic_json(internal_directory(config.root) / "storage-active.json", {"mode": config.storage_mode})

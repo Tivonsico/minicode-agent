@@ -1,9 +1,11 @@
 import asyncio
+import hashlib
 import os
 import tempfile
 
-from backend.conversation.store import sync_directory
+from backend.observability.scope import current
 from backend.permissions.paths import check_content, fingerprint
+from backend.storage.files import sync_directory
 
 from .base import ToolError
 
@@ -42,7 +44,52 @@ class FileOperations:
             f"{i + 1}: {line}"
             for i, line in enumerate(lines[start - 1 : start - 1 + count], start - 1)
         )
-        return before, content
+        return before, content, len(lines)
+
+    def record_text_write(self, cid, path, content, *, executable=False):
+        # Readback proves a plain-text edit, not that executable code works.
+        name = path.name.casefold()
+        if (path.suffix.lower() != ".txt" or executable or content.startswith("#!")
+                or name in {"cmakelists.txt", "cmakecache.txt", "meson_options.txt"}
+                or name.startswith(("requirements", "constraints"))):
+            self.text_writes.pop(path, None)
+            return
+        previous = self.text_writes.get(path, {})
+        source = current(getattr(self.output_store, "store", None))
+        self.text_writes[path] = {
+            "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            "ranges": [],
+            "read_version": None,
+            "mutations": previous.get("mutations", []) + [
+                {"call_id": cid, "request_id": source.get("request_id")}
+            ],
+        }
+
+    def verify_text_read(self, path, before, start, count, total):
+        expected = self.text_writes.get(path)
+        if not expected:
+            return
+        if expected["read_version"] != before:
+            expected["ranges"] = []
+            expected["read_version"] = before
+        if before[0] != expected["sha256"]:
+            return
+        expected["ranges"].append((start, min(start + count - 1, total)))
+        covered = 0
+        merged = []
+        for low, high in sorted(expected["ranges"]):
+            if merged and low <= merged[-1][1] + 1:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], high))
+            else:
+                merged.append((low, high))
+        expected["ranges"] = merged
+        if merged and merged[0][0] == 1:
+            covered = merged[0][1]
+        if covered >= total and merged[0][0] == 1:
+            self.emit(
+                "file_verification_result", status="passed", source="readback",
+                path=str(path), sha256=before[0], mutations=expected["mutations"],
+            )
 
     def _grep_matches(self, path, pattern, relative):
         _, text = self._snapshot(path)

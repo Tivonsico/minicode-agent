@@ -5,7 +5,7 @@ import json
 import re
 import uuid
 
-from backend.conversation.store import atomic_json, internal_directory
+from backend.storage.files import atomic_json, internal_directory
 
 
 def redact(value, secrets=()):

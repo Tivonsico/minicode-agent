@@ -16,6 +16,8 @@ dependencies = [
     "psutil>=6,<8",
     "pymysql[rsa]>=1.1,<2",
     "greenback>=1.3,<2",
+    "google-api-python-client>=2.150,<3",
+    "google-auth-oauthlib>=1.2,<2",
 ]
 
 [project.scripts]

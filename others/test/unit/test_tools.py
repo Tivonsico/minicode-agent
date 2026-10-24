@@ -293,3 +293,51 @@ async def test_slow_search_does_not_block_ui_and_cancels_promptly(
     with pytest.raises(asyncio.CancelledError):
         await task
     assert asyncio.get_running_loop().time() - started < 0.15
+
+
+async def test_recursive_search_skips_dependencies_unless_explicit(tmp_path, setup_tools):
+    executor, *_ = setup_tools
+    (tmp_path / "note.txt").write_text("target")
+    dependencies = tmp_path / ".venv"
+    dependencies.mkdir()
+    for index in range(501):
+        (dependencies / f"dependency-{index}.txt").write_text("irrelevant")
+    result = (await executor.execute_batch([call("Glob", {"pattern": "**/*.txt"})]))[0]
+    assert result.status == "succeeded"
+    assert result.content == "note.txt"
+    explicit = (await executor.execute_batch([
+        call("Glob", {"pattern": ".venv/dependency-0.txt"}, "explicit")
+    ]))[0]
+    assert explicit.content == ".venv/dependency-0.txt"
+
+
+async def test_search_limit_returns_useful_results_with_truncation_notice(tmp_path, setup_tools):
+    executor, *_ = setup_tools
+    for index in range(501):
+        (tmp_path / f"note-{index}.txt").write_text("target")
+    result = (await executor.execute_batch([call("Glob", {"pattern": "*.txt"})]))[0]
+    assert result.status == "succeeded"
+    assert "note-" in result.content
+    assert "truncated" in result.content.lower()
+    assert "narrower" in result.content.lower()
+
+
+@pytest.mark.parametrize("change", ["external", "another_write"])
+async def test_text_readback_does_not_combine_ranges_from_different_versions(
+    tmp_path, setup_tools, change
+):
+    executor, _, _, events = setup_tools
+    content = "first\nsecond\nthird\n"
+    await executor.execute_batch([call("WriteFile", {"path": "note.txt", "content": content}, "write")])
+    await executor.execute_batch([call("ReadFile", {"path": "note.txt", "line_count": 1}, "first")])
+    if change == "external":
+        path = tmp_path / "note.txt"
+        previous = path.stat().st_mtime_ns
+        path.write_text(content)
+        os.utime(path, ns=(previous + 1_000_000, previous + 1_000_000))
+    else:
+        await executor.execute_batch([call("WriteFile", {"path": "note.txt", "content": content}, "rewrite")])
+    await executor.execute_batch([call("ReadFile", {"path": "note.txt", "start_line": 2}, "rest")])
+    assert not any(kind == "file_verification_result" for kind, _ in events)
+    await executor.execute_batch([call("ReadFile", {"path": "note.txt", "line_count": 1}, "fresh-first")])
+    assert any(kind == "file_verification_result" for kind, _ in events)

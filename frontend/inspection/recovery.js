@@ -1,24 +1,12 @@
-import { modeName } from "../modes.js";
 import { post } from "../api.js";
 import { element } from "../messages.js";
-import { $, disclosure, empty, time } from "./shared.js";
+import { $ } from "./shared.js";
 
-export function checkpointViewer(getSession, refresh, handleError) {
-  $("checkpoint-sync").onclick = () =>
-    handleError(async () => {
-      $("checkpoint-sync").disabled = true;
-      try {
-        await post(`/sessions/${getSession()}/checkpoints/sync`);
-        await refresh();
-        $("inspection-status").textContent = "已保存当前任务状态。";
-      } finally {
-        $("checkpoint-sync").disabled = false;
-      }
-    });
+export function recoveryViewer(getSession, refresh, handleError) {
   return (data) => {
-    $("checkpoint-recovery").textContent = data.recovery?.source === "checkpoint"
-      ? `本次从检查点 #${data.recovery.covered_seq} 恢复，启动读取后续 ${data.recovery.loaded_records} 条事件。完整旧轨迹仍可在日志中查看。`
-      : "本次从完整日志恢复；保存检查点后，后续重启可跳过已覆盖的前缀。";
+    $("journal-recovery").textContent = data.recovery?.source === "journal_snapshot"
+      ? `本次从日志快照 #${data.recovery.covered_seq} 加载，回放后续 ${data.recovery.loaded_records} 条事件。`
+      : "本次从完整事件日志恢复。";
     const unresolved = $("unresolved-operations");
     unresolved.replaceChildren();
     for (const operation of data.unresolved_operations || []) {
@@ -52,17 +40,5 @@ export function checkpointViewer(getSession, refresh, handleError) {
       }); };
       unresolved.append(form);
     }
-    const container = $("checkpoint-records");
-    container.replaceChildren();
-    for (const record of [...data.checkpoints].reverse()) {
-      container.append(
-        disclosure(
-          `${time(record.time)} · ${record.source === "automatic" ? "自动" : "手动"} · ${modeName(record.agent_mode)} · ${record.state.status} · 日志 #${record.covered_seq}`,
-          record,
-        ),
-      );
-    }
-    if (!data.checkpoints.length)
-      empty(container, "暂无检查点。点击同步即可保存当前状态。");
   };
 }

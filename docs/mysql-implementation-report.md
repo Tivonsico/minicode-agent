@@ -1,3 +1,5 @@
+> 2026-10-24 更新：本文为历史验收记录。当前已删除独立任务 Checkpoint，摘要备份改为 context/compation_ckeckpoint.py，日志快照改用 mc_journal_snapshots。当前协议见 [恢复说明](checkpoint-recovery.md)。
+
 # MiniCode MySQL 实现交付记录
 
 2026-10-19。本记录描述实现阶段；该阶段没有提交、推送、合并、部署或重启用户应用。用户随后授权本机安装配置并上传 GitHub，最新状态见 [本机安装与连接](mysql-local-setup.md)。
@@ -24,7 +26,7 @@ checkpoint 与事件在一致边界保存，校验后按 covered_seq 查询后�
 
 - 完整测试：272 passed，包含原本地兼容测试及 15 项真实 MySQL 测试。
 - 真实数据库：临时 MySQL 8.4.11，仅本机 Unix socket，随机隔离数据库，不使用生产凭证。
-- 覆盖：Context/checkpoint 重开、covered_seq 后缀、稳定 ID 幂等、COMMIT 回执丢失、确认失败冻结、持久人工核实、旧 owner 拒绝、嵌套工作区冲突、取消认领清理、12 会话并发写入、实际 HTTP 文件操作。
+- 覆盖：Context/compaction_cache 重开、covered_seq 后缀、稳定 ID 幂等、COMMIT 回执丢失、确认失败冻结、持久人工核实、旧 owner 拒绝、嵌套工作区冲突、取消认领清理、12 会话并发写入、实际 HTTP 文件操作。
 - 运行隔离：A 会话持有真实数据库行锁 1.5 秒时，B 会话在 0.8 秒内完成接单和取消，A 尚未解除阻塞。
 - 静态检查、21 个前端模块语法检查和 wheel/sdist 构建通过。
 - 浏览器验证当前模式与配置错误提示，控制台无错误；截图位于 `others/test_record/mysql-config.jpg`。隔离预览未调用真实模型。

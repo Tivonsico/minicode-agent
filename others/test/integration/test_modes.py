@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from backend.context.checkpoint import ContextCheckpoint
+from backend.context.compation_ckeckpoint import CompactionCheckpoint
 from backend.conversation.resume import recover_session
 from backend.conversation.store import SessionStore
 from backend.evaluation.models import Case
@@ -122,8 +122,8 @@ async def test_profiles_frozen_while_running_and_origin_preserved(tmp_path):
         ).status_code == 422
         assert other.agent_mode == "manual"
         assert "NEW_NOTE" not in provider.skill_contexts[0]
-        checkpoint = (await connection.post(base + "/checkpoints/sync")).json()
-        assert tags(checkpoint) == tags(plan) and checkpoint["state"]["status"] == "running"
+        accepted = next(e for e in item.store.events if e["type"] == "run_accepted")
+        assert tags(accepted) == tags(plan) and item.busy()
         await item.cancel()
         first_run = item.run_id
         assert all(tags(e) == tags(plan) for e in item.store.events if e.get("run_id") == first_run)
@@ -133,18 +133,17 @@ async def test_profiles_frozen_while_running_and_origin_preserved(tmp_path):
         ).json()
         assert tags(artifact) == tags(plan)
         item.select_mode("auto")
-        # A manually saved old task is still Plan, even though the next run is Auto.
-        saved = (await connection.post(base + "/checkpoints/sync")).json()
-        assert saved["agent_mode"] == "plan"
+        # Historical events retain their original mode.
+        assert accepted["agent_mode"] == "plan"
         provider.block.set()
         item.start("再次给出计划", agent_mode="plan")
         await until(lambda: not item.busy())
         assert "NEW_NOTE" in provider.skill_contexts[-1]
-        assert item.checkpoints.snapshot()["mode_prompt_version"] != plan["mode_prompt_version"]
+        assert item.run_profile["mode_prompt_version"] != plan["mode_prompt_version"]
         assert service.get(item.store.session_id).agent_mode == "plan"
         # Compression remembers both the current mode and covered message origins.
         with scope(item.store, **tags(item.run_profile)):
-            ContextCheckpoint(item.store).save(
+            CompactionCheckpoint(item.store).save(
                 item.loop.conversation.messages(), [{"role": "user", "content": "摘要"}], 1
             )
         summary = item.store.events[-1]
@@ -465,4 +464,5 @@ async def test_shell_uses_mode_policy_inside_verified_sandbox(mode, tmp_path):
             1 if mode in {"manual", "accept_edit"} else 0
         )
         if mode != "plan":
-            assert item.checkpoints.snapshot()["verification_status"] == "passed"
+            from backend.runtime.verification import completion_check
+            assert completion_check(item.store.view, item.turn_id)["accepted"]

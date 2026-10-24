@@ -9,10 +9,11 @@ import { evaluations } from "./evaluation/app.js";
 import { modeControls } from "./modes.js";
 import { persistenceHelp, reconcileOwner } from "./persistence.js";
 import { reasoningSelector } from "./reasoning.js";
+import { snapshotHistory } from "./snapshots.js";
 let selectedReasoning = () => undefined;
 const $ = (id) => document.getElementById(id);
 hydrateIcons();
-persistenceHelp();
+persistenceHelp(notify);
 let detail = null,
   controller = null,
   prompts = [],
@@ -39,7 +40,7 @@ async function refreshSessions() {
       session.session_id === detail?.session.session_id ? "active" : "",
     );
     button.append(
-      element("span", session.title || "新会话"),
+      element("span", session.recovery_study?.label || session.title || "新会话"),
       element(
         "small",
         session.status === "error"
@@ -99,16 +100,16 @@ const actions = {
 };
 function render() {
   if (!detail) return;
-  $("session-title").textContent = detail.session.title;
+  $("session-title").textContent = detail.recovery_study?.label || detail.session.title;
   $("chat-view").dataset.empty = String(
     !detail.running &&
       !detail.events.some(
         (event) => (event.type === "message" && event.role === "user") || event.type === "run_accepted",
       ),
   );
-  $("conversation-title").textContent = detail.session.title;
+  $("conversation-title").textContent = detail.recovery_study?.label || detail.session.title;
   $("conversation-title").title = detail.session.title;
-  renderMessages($("messages"), detail.events);
+  renderMessages($("messages"), detail.events, openSnapshots);
   renderWorkspace(detail, actions);
   modes.render(detail);
 }
@@ -129,11 +130,12 @@ function onEvent(event) {
   )
     return;
   detail.events.push(event);
-  if (event.type === "checkpoint" || event.type === "task_state") Object.assign(detail.state, event.state);
-  if (event.type === "turn_start") detail.running = true;
-  if (event.type === "turn_end") {
+  if (event.type === "turn_start" || event.type === "run_accepted") detail.running = true;
+  if (event.type === "file_snapshots_ready") {
     detail.running = false;
-    detail.state.status = event.status;
+    safely(refreshSessions);
+  }
+  if (event.type === "turn_end") {
     safely(refreshSessions);
   }
   if (
@@ -174,6 +176,9 @@ async function load(sid) {
   const next = await request(`/sessions/${sid}`);
   if (generation !== loading) return;
   detail = next;
+  const sessionUrl = new URL(window.location.href);
+  sessionUrl.searchParams.set("session", sid);
+  window.history.replaceState(null, "", sessionUrl);
   controller = new AbortController();
   notify("");
   render();
@@ -297,6 +302,8 @@ $("save-prompt").onclick = async () => {
     $("prompt-error").textContent = error.message;
   }
 };
+const openSnapshots = snapshotHistory(() => detail, load, notify);
+$("snapshots-open").onclick = () => openSnapshots();
 const modes = modeControls(() => detail, load, safely);
 const openInspection = inspection(
   () => detail,
@@ -322,7 +329,9 @@ safely(async () => {
   $("sandbox").textContent =
     `${info.sandbox_available ? "●" : "○"} ${info.sandbox_reason}`;
   const list = await refreshSessions();
-  const existing = list.find((item) => item.status !== "error");
+  const requestedSession = new URL(window.location.href).searchParams.get("session");
+  const existing = list.find((item) => item.session_id === requestedSession && item.status !== "error")
+    || list.find((item) => item.status !== "error");
   const sid =
     existing?.session_id || (await post("/sessions")).session.session_id;
   await load(sid);

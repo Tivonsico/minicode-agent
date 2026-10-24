@@ -1,7 +1,13 @@
 import { element } from "./messages.js";
 const $ = (id) => document.getElementById(id);
 export function renderWorkspace(detail, actions) {
-  const state = detail.state || {};
+  const events = detail.events || [];
+  const latest = (types) => events.findLast((event) => types.includes(event.type));
+  const turn = latest(["run_accepted", "turn_start"]);
+  const turnEvents = events.filter((event) => event.turn_id === turn?.turn_id);
+  const ending = latest(["run_end", "turn_end"]);
+  const objective = [...turnEvents].reverse().find((event) => event.type === "message" && event.role === "user")?.content
+    || turnEvents.find((event) => event.type === "run_accepted")?.input?.content;
   const running = detail.running;
   $("run-status").textContent = detail.approvals?.length
     ? "等待审批"
@@ -12,7 +18,7 @@ export function renderWorkspace(detail, actions) {
           interrupted: "已停止",
           failed: "失败",
           paused: "已暂停",
-        }[state.status] || "就绪";
+        }[ending?.status] || "就绪";
   $("send").disabled = running;
   $("send").hidden = running;
   $("reasoning-effort").disabled = running;
@@ -58,10 +64,11 @@ export function renderWorkspace(detail, actions) {
   const task = $("task-state");
   task.replaceChildren();
   task.append(
-    element("div", state.objective || "等待新的任务", "task-objective"),
-    element("div", `本轮模型请求 ${state.request_count || 0} 次`, "task-meta"),
+    element("div", objective || "等待新的任务", "task-objective"),
+    element("div", `本轮模型请求 ${turnEvents.filter((event) => event.type === "request_start" && event.purpose === "main").length} 次`, "task-meta"),
   );
-  const estimate = state.context_estimate || 0,
+  const measurement = [...turnEvents].reverse().find((event) => event.type === "context_measurement");
+  const estimate = measurement?.token_count ?? measurement?.byte_upper_bound ?? 0,
     budget = detail.context_budget || 1;
   $("context-size").textContent =
     `${estimate.toLocaleString()} / ${budget.toLocaleString()}`;

@@ -5,7 +5,13 @@ export function element(tag, text, className) {
   if (className) node.className = className;
   return node;
 }
-export function renderMessages(container, events) {
+export function changeCounts(added, deleted) {
+  const counts = element("span", undefined, "change-counts");
+  counts.append(element("span", `+${added}`, "lines-added"), element("span", `−${deleted}`, "lines-deleted"));
+  counts.setAttribute("aria-label", `新增 ${added} 行，删除 ${deleted} 行`);
+  return counts;
+}
+export function renderMessages(container, events, onSnapshot) {
   const closeToEnd =
     container.scrollHeight - container.scrollTop - container.clientHeight < 100;
   const open = new Set(
@@ -16,10 +22,17 @@ export function renderMessages(container, events) {
   const entries = [],
     messages = new Map(),
     calls = new Map();
-  const discarded = new Set(events.filter(e => e.type === "request_recovery").map(e => e.message_id));
+  const discarded = new Set(events.filter(e =>
+    ["request_recovery", "completion_deferred"].includes(e.type) ||
+    (e.type === "completion_check" && ["blocked", "review_requested"].includes(e.status))
+  ).map(e => e.message_id));
   const resolutions = new Map(events.filter(e => e.type === "operation_reconciled").map(e => [e.result_seq, e]));
   const toolKey = (event, id) => JSON.stringify([event.turn_id || "", event.request_id || "", id]);
   for (let event of events) {
+    if (event.type === "file_snapshot_completed") {
+      entries.push({ ...event, role: "snapshot" });
+      continue;
+    }
     if (discarded.has(event.message_id)) continue;
     if (event.type === "run_accepted" && event.input) event = { ...event, ...event.input, type: "message" };
     if (event.type === "tool_result" && resolutions.has(event.seq)) {
@@ -102,6 +115,16 @@ export function renderMessages(container, events) {
   }
   const fragment = document.createDocumentFragment();
   for (const item of entries) {
+    if (item.role === "snapshot") {
+      const wrap = element("div", undefined, "message snapshot-inline");
+      const button = element("button", undefined, "snapshot-chip");
+      button.append(element("span", "文件改动"), changeCounts(item.added, item.deleted));
+      button.onclick = () => onSnapshot?.(item.snapshot);
+      wrap.append(button);
+      if (item.snapshot.status === "unknown") wrap.append(element("small", "操作状态待核实"));
+      fragment.append(wrap);
+      continue;
+    }
     if (item.role === "tool") {
       const wrap = element("details", undefined, "message tool");
       wrap.dataset.call = item.call_id;

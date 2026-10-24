@@ -4,6 +4,11 @@ from backend.tools.executor import ToolExecutor
 from test.support.tooling import Outputs
 
 
+def pytest_configure(config):
+    # A fresh checkout has no ignored test-output directories yet.
+    (config.rootpath / "others" / "test_record").mkdir(parents=True, exist_ok=True)
+
+
 @pytest.fixture
 def setup_tools(tmp_path):
     approvals, events = [], []

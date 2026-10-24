@@ -9,23 +9,22 @@ from backend.observability.scope import current, scope
 
 
 class ApprovalBroker:
-    def __init__(self, publish, checkpoints, lifetime=600):
-        self.publish, self.checkpoints, self.lifetime = publish, checkpoints, lifetime
+    def __init__(self, publish, store, lifetime=600):
+        self.publish, self.store, self.lifetime = publish, store, lifetime
         self.pending = {}
         self.run_id = None
 
     async def ask(self, request):
         ticket = uuid.uuid4().hex
-        with scope(self.checkpoints.store, approval_id=ticket):
+        with scope(self.store, approval_id=ticket):
             return await self._ask(request, ticket)
 
     async def _ask(self, request, ticket):
         started = time.monotonic()
         future = asyncio.get_running_loop().create_future()
-        item = {**current(self.checkpoints.store), **request, "id": ticket, "run_id": self.run_id}
+        item = {**current(self.store), **request, "id": ticket, "run_id": self.run_id}
         outcome = "cancelled"
         self.pending[ticket] = (item, future)
-        self.checkpoints.update(pending_tool={"ticket": ticket, "name": item["name"]})
         self.publish("approval_requested", **item)
         try:
             approved = await asyncio.wait_for(future, self.lifetime)
@@ -36,7 +35,6 @@ class ApprovalBroker:
             return False
         finally:
             self.pending.pop(ticket, None)
-            self.checkpoints.update(pending_tool=None)
             self.publish(
                 "approval_closed",
                 id=ticket,

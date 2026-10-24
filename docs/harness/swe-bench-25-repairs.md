@@ -10,7 +10,7 @@
 
 按照首轮前的协议，取各仓库在清单中最早一项“已有官方判定但 unresolved”的任务，至多一项。最终开发组为 Django 11564、pytest 11148、Requests 2148、Sphinx 7738；Pylint 和 SymPy 没有符合条件的题。[开发组清单](swe-bench-25-development-manifest.json) 在代码修改和重复运行前固定。它是按失败选出的开发组，此后不能称为未参与调试的验收集。
 
-旧版源码单独冻结并启动，用相同参数重复一次；新版运行两次。各次使用新候选工作区、同一 Issue/base commit、同一原生依赖和官方镜像。预算保持 GLM-5.3-Flash / auto / low / Agent 600 秒 / 官方测试 900 秒 / 30 次实际请求；重试计入预算。没有固定模型采样种子，选题种子不保证模型输出可复现。全部结果见 [开发组对照](swe-bench-25-development-results.md)。
+旧版源码单独冻结并启动，已用相同参数重复一次。原计划新版运行两次，但第一轮在 Django 执行中按用户要求取消，第二轮未启动，因此尚无完成的新版本效果对照。各次使用新候选工作区、同一 Issue/base commit、同一原生依赖和官方镜像。预算保持 GLM-5.3-Flash / auto / low / Agent 600 秒 / 官方测试 900 秒 / 30 次实际请求；重试计入预算。没有固定模型采样种子，选题种子不保证模型输出可复现。已发生的逐次运行见 [30 道任务复核](swe-bench-30-task-review.json)。
 
 ## Shell 无差别使读取证据失效
 
@@ -61,14 +61,16 @@ Requests 3362 已在 `fe1f25878e4141d5a6b49ad5b63809f8` 单独重验并 resolved
 | --- | --- | --- |
 | Django 11564 | 0/2、174/174 | 只调整静态文件模板上下文前缀，未覆盖 storage、STATIC_URL/MEDIA_URL 等行为，目标需求未解决。 |
 | pytest 11148 | 0/2、129/129 | 补丁仅增加复现脚本，没有生产代码修复。旧版重复运行已通过，单次失败不代表版本必然失败。 |
-| Requests 2148 | 8/10、109/118 | 宽泛捕获 ProtocolError/socket.error 并转为 ConnectionError，异常分类与旧行为不兼容，且有回归。 |
+| Requests 2148 | 8/10、109/118 | 混合原因：目标 socket-error 测试通过，但补丁将 ContentDecodingError 再次包装为 ConnectionError，造成确定的异常兼容回归。其他失败还包含远端断连及旧 pytest.raises 字符串调用不兼容，不能全部归因于补丁。 |
 | pytest 7220 | 0/1、11/11 | 增加 rootdir 参数，但调用路径未接通；只读 Shell 引起的 stale_read 也消耗请求。 |
 | Sphinx 7738 | 1/1、29/30 | 去掉下划线转义修复目标症状，但处理位于 napoleon_use_ivar 分支之前，破坏另一个分支。 |
-| Requests 1963 | 6/7、111/112 | 补丁仅删空行，重定向时复制原请求的功能行为没有改变。 |
+| Requests 1963 | 6/7、111/112 | 重定向目标用例仍把 GET 变为 POST，补丁仅删空行，功能未修复。同时存在 HTTP 502 与旧 pytest.raises 调用不兼容，不能把全部测试失败都解释为 Agent 回归。 |
 
 判断来自首次补丁与官方报告。没有把任务专用提示、隐藏断言或参考解法写入运行时。它们说明修复运行器不等于候选实现正确。首轮结束原因为 RequestLimit 9、verification_required 5、ProviderError 2、stop 9；9 道正常完成中有失败，16 道暂停中也有补丁通过，执行状态不能代替独立验收。
 
 原生与官方 Linux 环境的 Python、Requests 测试依赖及插件方式有差异，见 [环境记录](swe-bench-25-environment.md)。部分轨迹还包含沙箱 Git/命令行工具探测失败，及模型复现脚本或测试命令自身错误。错误逐项保留，不统一解释为缺依赖，也未放宽沙箱帮助通过。
+
+2026-10-23 复核原始日志补充：Pylint 7080 虽通过包导入预检，实际运行 tests/test_self.py 时仍因缺少 py._path 而收集失败；还有模块加载与消息注册错误。因此该题属于原生测试环境不足、执行收敛失败共同影响，不能仅根据 RequestLimit 判为纯模型能力问题。Django 11797 的 Max/connection 导入错误，以及调试打印 SQL Query 触发递归，则来自模型复现脚本。完整分类、逐题验收范围与证据见 [30 道任务复核](swe-bench-30-task-review.md)。官方首轮结果未作调整。
 
 ## 工程验证与结论边界
 

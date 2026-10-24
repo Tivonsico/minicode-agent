@@ -37,19 +37,18 @@ def database(tmp_path):
 
 
 def test_mysql_context_and_checkpoint_reopen_from_suffix(database, tmp_path):
-    from backend.checkpoint import Checkpoints
     from backend.conversation.projection import project_messages
     from backend.storage.mysql_store import MySQLSessionStore
 
     store = MySQLSessionStore(database, tmp_path)
     store.append("message", message_id="u", role="user", content="保留我的任务")
-    Checkpoints(store).capture()
+    store.save_snapshot()
     store.append("message", message_id="a", role="assistant", content="已保存", is_final=True)
     reopened = MySQLSessionStore(database, tmp_path, store.session_id)
-    assert reopened.recovery_info["source"] == "checkpoint"
+    assert reopened.recovery_info["source"] == "journal_snapshot"
     assert reopened.recovery_info["loaded_records"] == 1
     assert [m["content"] for m in project_messages(reopened.view)] == ["保留我的任务", "已保存"]
-    assert len(reopened.events) == 3
+    assert len(reopened.events) == 2
     assert not (reopened.directory / "session.jsonl").exists()
 
 
@@ -266,7 +265,7 @@ async def test_mysql_runtime_file_tool_intent_result_and_reopen(database, tmp_pa
             assert outcome["status"] == "succeeded"
             assert prepared["operation_id"] == started["operation_id"] == outcome["operation_id"]
             store = MySQLSessionStore(database, tmp_path, sid)
-            assert store.recovery_info["source"] == "checkpoint"
+            assert store.recovery_info["source"] == "journal_snapshot"
 
 
 async def test_row_lock_wait_does_not_block_other_session_cancel(database):
@@ -392,3 +391,191 @@ def test_frozen_runtime_writer_can_be_reopened_after_persistent_owner_review(fau
     assert not reopened.store.failed
     assert reopened.store.owner != previous_owner
     reopened.store.close()
+
+
+async def test_snapshot_links_survive_mysql_checkpoint_and_restore(database):
+    from backend.api.app import create_app
+    from backend.storage.mysql_store import MySQLSessionStore
+    from test.integration.test_web import ScriptedProvider
+
+    project = database.config.root.parent / "snapshot-project"
+    project.mkdir()
+    target = project / "note.txt"
+    target.write_text("before\n")
+    provider = ScriptedProvider()
+    app = create_app(database.config, provider, initialize_sandbox=False, database=database)
+    service = app.state.service
+    try:
+        item = service.create()
+        item.permissions.add(str(project))
+        item.start("snapshot round", agent_mode="auto")
+        await item.task
+        first = item.file_snapshots.listing()[0]
+        repository, _ = item.file_snapshots.resolve(first["project_id"], first["id"])
+        assert repository.files(first["before"]) == repository.files(first["after"])
+        item.store.save_snapshot()
+        reopened = MySQLSessionStore(database, database.config.root, item.store.session_id)
+        completed = next(e for e in reopened.events if e["type"] == "file_snapshot_completed")
+        assert completed["snapshot"]["project_id"] == first["project_id"]
+        assert completed["snapshot"]["run_id"] == first["run_id"]
+        assert any(e["type"] == "file_snapshot_completed" for e in reopened.view)
+        assert not (item.store.directory / "session.jsonl").exists()
+        target.write_text("manual\n")
+        import httpx
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                base_url="http://127.0.0.1:8765", headers={"X-Minicode-Token": app.state.token}) as client:
+            url = f"/api/sessions/{item.store.session_id}/file-snapshots/{first['project_id']}/{first['id']}"
+            plan = (await client.post(url + "/preview")).json()
+            response = await client.post(url + "/restore", json={"token": plan["token"],
+                                                                     "accept_conflicts": True})
+            assert response.status_code == 200, response.text
+        assert target.read_text() == "before\n"
+        assert item.store.claim is None
+    finally:
+        # The fixture owns the test database; release service resources without
+        # closing its shared connection pool until the fixture performs cleanup.
+        await service.long_memory.close()
+        for item in service.sessions.values():
+            item.store.close()
+
+
+async def test_mysql_text_readback_completes_once_and_coalesces_stream(database, tmp_path):
+    import asyncio
+
+    import httpx
+
+    from backend.api.app import create_app
+    from backend.runtime.provider import Response
+    from test.support.tooling import call
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    class Provider:
+        requests = 0
+
+        async def complete(self, messages, tools, on_delta, on_attempt, purpose="main"):
+            await on_attempt(1)
+            if purpose != "main":
+                return Response("[]", [], "stop", None)
+            self.requests += 1
+            if self.requests == 1:
+                return Response("", [call("WriteFile", {"path": "note.txt", "content": "哈基米南北绿豆\n"}, "write")], "tool_calls", None)
+            if self.requests == 2:
+                return Response("", [call("ReadFile", {"path": "note.txt"}, "read")], "tool_calls", None)
+            for _ in range(1000):
+                await on_delta({"type": "text", "content": "字"})
+            return Response("字" * 1000, [], "stop", None)
+
+    provider = Provider()
+    app = create_app(database.config, provider, initialize_sandbox=False, database=database)
+    app.state.service.sandbox._verified = True
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1:8765",
+            headers={"X-Minicode-Token": app.state.token}) as client:
+            sid = (await client.post("/api/sessions")).json()["session"]["session_id"]
+            assert (await client.post(f"/api/sessions/{sid}/directories", json={"action": "add", "path": str(project)})).status_code == 200
+            assert (await client.post(f"/api/sessions/{sid}/runs", json={"text": "写入TXT并读回验证", "agent_mode": "auto"})).status_code == 202
+            item = app.state.service.get(sid)
+            async with asyncio.timeout(15):
+                while item.busy():
+                    await asyncio.sleep(0.01)
+            detail = (await client.get(f"/api/sessions/{sid}")).json()
+            assert item.loop.status == "completed"
+            assert any(e["type"] == "file_verification_result" and e["status"] == "passed" for e in detail["events"])
+            assert provider.requests == 3
+            assert (project / "note.txt").read_text() == "哈基米南北绿豆\n"
+            replies = [m for m in detail["messages"] if m["role"] == "assistant" and not m.get("tool_calls")]
+            assert [m["content"] for m in replies] == ["字" * 1000]
+            deltas = [e for e in detail["events"] if e["type"] == "assistant_delta"]
+            assert "".join(e["content"] for e in deltas) == "字" * 1000
+            assert len(deltas) < 100
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX restart cleanup")
+def test_launcher_shutdown_releases_mysql_session_for_the_next_backend(database):
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from backend.runtime.process import stop
+    from backend.storage.mysql_store import MySQLSessionStore
+
+    code = """
+import asyncio, sys
+from pathlib import Path
+import pymysql
+from backend.config import Config
+from backend.execution import gate
+from backend.runtime.service import RuntimeService
+from backend.storage.mysql import MySQLDatabase
+from backend.storage.project_lock import ProjectLock
+root = Path(sys.argv[1])
+gate.lock_directory = lambda: root.parent / 'child-gate'
+gate.mysql_domain_path = lambda: gate.lock_directory() / 'mysql-domain.json'
+config = Config(root, 'test-key', context_window=10000, max_output_tokens=1000,
+                storage_mode='mysql', mysql_host='localhost', mysql_user='root',
+                mysql_database=sys.argv[2])
+async def main():
+    db = MySQLDatabase(config, connect=lambda: pymysql.connect(unix_socket=sys.argv[3],
+         user='root', database=config.mysql_database, autocommit=True,
+         cursorclass=pymysql.cursors.DictCursor))
+    service = RuntimeService(config, provider=object(), database=db)
+    try:
+        item = service.create()
+        print(item.store.session_id, flush=True)
+        await asyncio.Event().wait()
+    finally:
+        await service.close()
+with ProjectLock(root):
+    asyncio.run(main())
+"""
+    process = subprocess.Popen(
+        [sys.executable, "-c", code, str(database.config.root), database.config.mysql_database,
+         os.environ["MINICODE_TEST_MYSQL_SOCKET"]],
+        cwd=Path(__file__).resolve().parents[3], stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        sid = process.stdout.readline().strip()
+        assert len(sid) == 32, process.stderr.read() if process.poll() is not None else sid
+        assert stop(database.config.root)
+        process.wait(timeout=5)
+        reopened = MySQLSessionStore(database, database.config.root, sid)
+        reopened.acquire_owner()
+        assert reopened.owner
+        reopened.close()
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+
+
+async def test_local_session_can_save_mysql_configuration(database, monkeypatch):
+    from dataclasses import replace
+
+    import httpx
+
+    from backend.api import storage
+    from backend.api.app import create_app
+    from backend.storage.mysql import MySQLDatabase
+    from test.integration.test_web import ScriptedProvider
+
+    # Validate the target against the isolated server, not the host's live MySQL.
+    monkeypatch.setattr(storage, "MySQLDatabase", lambda config: MySQLDatabase(
+        config, connect=database._connect))
+    app = create_app(replace(database.config, storage_mode="local"), ScriptedProvider(),
+                     initialize_sandbox=False)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                base_url="http://127.0.0.1:8765",
+                headers={"X-Minicode-Token": app.state.token}) as client:
+            assert (await client.post("/api/sessions")).status_code == 201
+            response = await client.put("/api/storage", json={
+                "storage_mode": "mysql", "mysql_host": database.config.mysql_host,
+                "mysql_database": database.config.mysql_database, "mysql_user": "root",
+            })
+            assert response.status_code == 200
+            assert response.json()["active_mode"] == "local"
+            assert response.json()["configured"]["storage_mode"] == "mysql"
+            assert response.json()["restart_required"]

@@ -1,11 +1,13 @@
 """Project shutdown must kill its owner, never unrelated or stale PIDs."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import psutil
+import pytest
 
 from backend.runtime.process import stop
 from backend.storage.project_lock import ProjectLock
@@ -54,6 +56,64 @@ def test_shutdown_terminates_owner_and_children_and_releases_lock(tmp_path):
         with ProjectLock(tmp_path):
             pass
         assert not stop(tmp_path)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX graceful signal; Windows uses forced fallback")
+def test_shutdown_allows_owner_to_release_persistent_resources_before_exit(tmp_path):
+    code = """
+import signal, sys, time
+from pathlib import Path
+from backend.storage.project_lock import ProjectLock
+root = Path(sys.argv[1])
+lock = ProjectLock(root).acquire()
+def close(*args):
+    (root / 'released').write_text('database ownership released')
+    lock.release()
+    raise SystemExit(0)
+signal.signal(signal.SIGINT, close)
+print('ready', flush=True)
+while True:
+    time.sleep(1)
+"""
+    process = subprocess.Popen([sys.executable, "-c", code, str(tmp_path)], cwd=ROOT,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        assert process.stdout.readline().strip() == "ready"
+        assert stop(tmp_path)
+        process.wait(timeout=5)
+        assert (tmp_path / "released").read_text() == "database ownership released"
+        with ProjectLock(tmp_path):
+            pass
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX graceful signal; Windows uses forced fallback")
+def test_shutdown_force_stops_an_unresponsive_owner_after_grace_timeout(tmp_path):
+    code = """
+import signal, sys, time
+from pathlib import Path
+from backend.storage.project_lock import ProjectLock
+lock = ProjectLock(Path(sys.argv[1])).acquire()
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+print('ready', flush=True)
+while True:
+    time.sleep(1)
+"""
+    process = subprocess.Popen([sys.executable, "-c", code, str(tmp_path)], cwd=ROOT,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        assert process.stdout.readline().strip() == "ready"
+        assert stop(tmp_path, grace_timeout=0.1)
+        process.wait(timeout=5)
+        with ProjectLock(tmp_path):
+            pass
     finally:
         if process.poll() is None:
             process.kill()

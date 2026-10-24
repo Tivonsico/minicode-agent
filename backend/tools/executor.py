@@ -22,12 +22,14 @@ from .search import SearchOperations
 
 class ToolExecutor(ToolDispatch, FileOperations, SearchOperations):
     def __init__(
-        self, root: Path, output_store, approve, emit=None, session_permissions=None, skills=None
+        self, root: Path, output_store, approve, emit=None, session_permissions=None, skills=None,
+        *, history_recall=False,
     ):
         from backend.context.project_assets import ProjectAssets
         from backend.skills import SkillCatalog
 
         self.root = Path(root).resolve()
+        self.history_recall = history_recall
         self.output_store = output_store
         self.approve = approve
         self.emit = emit or (lambda *args, **kwargs: None)
@@ -45,7 +47,9 @@ class ToolExecutor(ToolDispatch, FileOperations, SearchOperations):
         self.permissions = PermissionPolicy()
         self.agent_mode = "manual"
         self.mode_profile = ModeSettings(self.root).profile(self.agent_mode)
-        self.registry = build_registry(self._dispatch)
+        self.registry = build_registry(self._dispatch, history_recall=history_recall)
+        from backend.recovery.effects import register
+        register(self)
         self.shell_executable = None
         self.shell_backend = None
         self._lock = asyncio.Lock()
@@ -89,6 +93,11 @@ class ToolExecutor(ToolDispatch, FileOperations, SearchOperations):
             if runtime
             else ""
         )
+        history_note = (
+            "RecallHistory reads this session's original user messages without a work directory "
+            "or network. For questions about earlier conversation details, use it before claiming "
+            "the information was never provided or is unavailable. " if self.history_recall else ""
+        )
         return (
             f"Available tools: {', '.join(s['function']['name'] for s in self.schemas())}; session history, "
             "directory grants via the browser directory controls, global and project skills via the browser skill selector, "
@@ -98,13 +107,15 @@ class ToolExecutor(ToolDispatch, FileOperations, SearchOperations):
             f"Mode {self.agent_mode}; tool decisions: {json.dumps(self.mode_profile['actions'])}. "
             "Read/search within these directories is automatic. Sensitive files stay "
             "blocked for file tools. A rejected approval ends this turn. "
-            f"{shell} Command syntax: {dialect}.{python}"
+            f"{history_note}{shell} Command syntax: {dialect}.{python}"
         )
 
     def reset_turn(self):
+        self.recalled_history = ""
         blocked = getattr(self, "pause_reason", None) == "termination_unknown"
         self._effect_started = set()
         self.reads = {}
+        self.text_writes = {}
         self.rejected = set()
         self._last_failure = None
         self._failure_count = 0
@@ -116,6 +127,9 @@ class ToolExecutor(ToolDispatch, FileOperations, SearchOperations):
         self.prompted_projects = set()
 
     def begin_turn(self, text: str):
+        if self.history_recall:
+            from backend.context.history_recall import recall_for_turn
+            self.recalled_history = recall_for_turn(self.output_store.store, text)
         if not self.session_permissions:
             return
         roots = self.session_permissions.roots()
@@ -357,6 +371,9 @@ class ToolExecutor(ToolDispatch, FileOperations, SearchOperations):
                 type(error).__name__,
             )
         self.emit("tool_result", **result.to_dict())
+        if name == "S2Effect" and result.status == "succeeded":
+            from backend.recovery.effects import barrier
+            await barrier(self, "after_result_persist", args)
         if result.status != "unknown" and cid in self._effect_started:
             self._lease.completed()
         return result

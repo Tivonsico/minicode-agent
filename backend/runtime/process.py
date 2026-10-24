@@ -1,13 +1,21 @@
-"""Stop only the process holding this project's runtime lock and its children."""
+"""Give the project owner time to flush state, then stop any surviving children."""
 
 import json
 import os
+import signal
 import time
 from pathlib import Path
 
 import psutil
 
 from backend.storage.project_lock import ProjectLock
+
+
+def _alive(process):
+    try:
+        return process.is_running() and process.status() != psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return False
 
 
 def _owner(path, root):
@@ -39,7 +47,7 @@ def _owner(path, root):
         return {"pid": process.pid, "created_at": process.create_time()}
 
 
-def stop(root):
+def stop(root, *, grace_timeout=8.0):
     root = Path(root).resolve()
     path = root / ".minicode" / "project.lock"
     if not path.exists():
@@ -61,12 +69,33 @@ def stop(root):
         if abs(process.create_time() - owner["created_at"]) > 0.001:
             raise RuntimeError("进程身份已变化，未终止任何进程")
         children = process.children(recursive=True)
+        if os.name != "nt":
+            # Uvicorn handles SIGINT by cancelling tasks and running lifespan
+            # cleanup, including releasing persistent MySQL session owners.
+            process.send_signal(signal.SIGINT)
+            deadline = time.monotonic() + grace_timeout
+            while _alive(process) and time.monotonic() < deadline:
+                # Cancellation may start cleanup helpers (for example Git
+                # snapshot commands). Retain their identities before reparenting.
+                try:
+                    children = list(
+                        {p.pid: p for p in [*children, *process.children(recursive=True)]}.values()
+                    )
+                except psutil.NoSuchProcess:
+                    break
+                time.sleep(0.05)
+            if _alive(process):
+                children = list(
+                    {p.pid: p for p in [*children, *process.children(recursive=True)]}.values()
+                )
+        # Unknown effects retain their database markers. Never clear them just
+        # because a process exited or the bounded graceful wait expired.
         for target in [*reversed(children), process]:
             try:
                 target.kill()
             except psutil.NoSuchProcess:
                 pass
-        psutil.wait_procs([*children, process], timeout=3)
+        psutil.wait_procs([p for p in [*children, process] if _alive(p)], timeout=3)
     except psutil.NoSuchProcess:
         pass
     except psutil.AccessDenied as error:

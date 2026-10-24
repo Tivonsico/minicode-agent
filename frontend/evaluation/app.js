@@ -4,6 +4,8 @@ import { $, empty, time } from "../inspection/shared.js";
 import { sweBench } from "./swe-bench.js";
 import { taskEditor } from "./editor.js";
 import { reports, rate } from "./reports.js";
+import { experimentArchive } from "./experiments.js";
+import { localTaskConversations } from "./conversation.js";
 import {
   frameworks,
   datasets,
@@ -49,6 +51,8 @@ export function evaluations(getDetail, showChat) {
     }
   }
   const officialView = sweBench(safely);
+  const archive = experimentArchive(safely);
+  const conversations = localTaskConversations(safely);
   let modelInfo = null;
   const view = reports(safely, loadReports);
   options(
@@ -57,6 +61,7 @@ export function evaluations(getDetail, showChat) {
     "local",
   );
   const local = () => $("evaluation-framework").value === "local";
+  const research = () => ["compaction", "recovery"].includes($("evaluation-framework").value);
   const datasetId = () => $("evaluation-dataset").value;
   const visibleCases = () =>
     casesIn(dataset?.cases || [], datasetId(), $("case-filter").value);
@@ -66,6 +71,10 @@ export function evaluations(getDetail, showChat) {
       editor.collect(dataset.cases[selected]);
   }
   function selectors() {
+    if (research()) {
+      archive.selectors($("evaluation-framework").value, options);
+      return;
+    }
     const choices = datasets[$("evaluation-framework").value];
     options(
       "evaluation-dataset",
@@ -95,14 +104,23 @@ export function evaluations(getDetail, showChat) {
   }
   function render() {
     selectors();
+    if (!local()) conversations.hide();
     $("local-library").hidden = !local();
-    $("swe-bench-setup").hidden = local();
-    $("swe-library").hidden = local();
+    $("swe-bench-setup").hidden = local() || research();
+    $("swe-library").hidden = local() || research();
     if (local()) officialView.close();
     $("benchmark-controls").hidden = !local() || datasetId() === "history";
     $("history-controls").hidden = !local() || datasetId() !== "history";
     $("evaluation-report").hidden =
       !local() || !$("report-heading").textContent;
+    if (research()) {
+      officialView.close();
+      editor.render(null);
+      $("evaluation-empty").hidden = true;
+      archive.open();
+      return;
+    }
+    archive.close();
     if (!local()) {
       const official = datasets.swe_bench.find((d) => d.id === datasetId());
       editor.render(null);
@@ -165,6 +183,7 @@ export function evaluations(getDetail, showChat) {
     if (!cases.length) empty(container, "当前分类暂无评测项。");
     $("evaluation-empty").hidden = !!cases.length;
     editor.render(dataset.cases[selected]);
+    conversations.show(dataset.cases[selected]);
     counts();
   }
   const modeInputs = [
@@ -209,6 +228,7 @@ export function evaluations(getDetail, showChat) {
     render();
   }
   async function loadReports() {
+    conversations.invalidate();
     const [saved, jobs] = await Promise.all([
       request("/evaluations/reports"),
       request("/evaluations/jobs"),
@@ -317,7 +337,7 @@ export function evaluations(getDetail, showChat) {
     });
   $("case-filter").onchange = () =>
     safely(async () => {
-      if (!local()) {
+      if (!local() && !research()) {
         officialView.filter();
         return;
       }
@@ -462,11 +482,13 @@ export function evaluations(getDetail, showChat) {
           "case-filter",
         ])
           $(id).disabled = true;
-        const [next, availableSessions, info] = await Promise.all([
+        const [next, availableSessions, info, experimentRecords] = await Promise.all([
           request("/evaluations/dataset"),
           request("/sessions"),
           request("/info"),
+          request("/evaluations/experiments"),
         ]);
+        archive.setRecords(experimentRecords);
         modelInfo = info;
         dataset = next;
         sessions = availableSessions;
@@ -513,6 +535,7 @@ export function evaluations(getDetail, showChat) {
     close: () => {
       visible = false;
       officialView.close();
+      archive.close();
       clearTimeout(timer);
       $("chat-view").hidden = false;
       $("evaluation-view").hidden = true;

@@ -107,7 +107,7 @@ U2 之所以能理解“刚才”，主要依赖消息历史，未必依赖长�
 |---|---|---|
 | 终端承担展示与部分运行职责 | 已有 Web API、后台会话 Task、可重放 SSE | 可供 Eval 使用的固定 headless 入口尚未建立 |
 | 缺少独立任务状态 | `ShortMemory` 将 objective、status、turn_id、请求数、估算、pending_tool 写日志及快照 | 缺少阶段、跨轮 task 身份、剩余统一预算、covered_seq |
-| 压缩只在内存复用 | `ContextCheckpoint` 已持久化 prepared_history 与 source_digest | 仍全历史投影/深拷贝，没有失败冷却和最小收益阈值 |
+| 压缩只在内存复用 | `CompactionCache` 已持久化 prepared_history 与 source_digest | 仍全历史投影/深拷贝，没有失败冷却和最小收益阈值 |
 | 长期记忆全量注入 | `ScopedMemory` 按活动授权项目或 unscoped 筛选 | 多项目混合任务的检索策略仍简单，历史不会因切换目录自动清空 |
 | Shell 完全不可用 | 已接入 CodexSandbox，并有启动探针和环境变量过滤 | 条件是本机验证通过；不能由一台 macOS 的结果推断全部平台可用 |
 | 无测试修复能力 | 模型可调用已验证 Shell，拿非零退出继续修改 | 没有自动测试策略、独立验收器或 repair 次数预算 |

@@ -121,6 +121,7 @@ export function taskEditor() {
   return {
     render(case_) {
       $("case-form").hidden = !case_;
+      $("case-editor-panel").hidden = !case_;
       if (!case_) return;
       $("case-name").value = case_.name;
       $("case-mode").value = case_.mode;

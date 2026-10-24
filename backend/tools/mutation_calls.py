@@ -1,8 +1,8 @@
 import difflib
 from pathlib import Path
 
-from backend.conversation.store import sync_directory
 from backend.permissions.paths import check_content, fingerprint
+from backend.storage.files import sync_directory
 
 from .base import ToolError, ToolResult
 
@@ -12,6 +12,7 @@ async def execute(executor, name, cid, args):
         path = executor.policy.resolve(args["path"])
         executor._touch_project(path, writing=True)
         existed = path.exists()
+        executable = existed and bool(path.stat().st_mode & 0o111)
         if existed and (not path.is_file()):
             raise ToolError("Target is not a regular file.", "not_file")
         if existed:
@@ -54,6 +55,7 @@ async def execute(executor, name, cid, args):
             raise ToolError("File changed after approval.", "stale_approval")
         executor.mark_running(cid, name)
         executor._write(args["path"], path, content, existed)
+        executor.record_text_write(cid, path, content, executable=executable)
         content = f"Saved {executor.policy.display(path)}"
     elif name == "DeleteFile":
         path = executor.policy.resolve(args["path"])

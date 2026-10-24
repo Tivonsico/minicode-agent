@@ -1,4 +1,4 @@
-"""Immediate shutdown entry point; no model or configuration reads."""
+"""Bounded shutdown entry point; no model or configuration reads."""
 
 import argparse
 from pathlib import Path

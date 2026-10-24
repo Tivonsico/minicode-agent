@@ -50,22 +50,6 @@ export function modeControls(getDetail, reload, safely) {
       );
     $("mode-feedback").textContent = "";
   }
-  $("agent-mode").onchange = () =>
-    safely(async () => {
-      savingSelection = true;
-      $("agent-mode").disabled = true;
-      try {
-        const sid = getDetail().session.session_id;
-        await request(`/sessions/${sid}/mode`, {
-          method: "PUT",
-          body: JSON.stringify({ agent_mode: $("agent-mode").value }),
-        });
-        await reload(sid);
-      } finally {
-        savingSelection = false;
-        render(getDetail());
-      }
-    });
   $("mode-details").onclick = () =>
     safely(async () => {
       profiles = await request("/modes");
@@ -78,9 +62,31 @@ export function modeControls(getDetail, reload, safely) {
       );
       $("mode-view").value = getDetail().agent_mode;
       showProfile();
+      render(getDetail());
       $("mode-dialog").showModal();
     });
-  $("mode-view").onchange = showProfile;
+  $("mode-view").onchange = async () => {
+    savingSelection = true;
+    $("mode-view").disabled = true;
+    $("mode-save").disabled = true;
+    try {
+      const sid = getDetail().session.session_id;
+      await request(`/sessions/${sid}/mode`, {
+        method: "PUT",
+        body: JSON.stringify({ agent_mode: $("mode-view").value }),
+      });
+      await reload(sid);
+      showProfile();
+    } catch (error) {
+      $("mode-view").value = getDetail().agent_mode;
+      showProfile();
+      $("mode-feedback").textContent = error.message;
+    } finally {
+      savingSelection = false;
+      $("mode-save").disabled = false;
+      render(getDetail());
+    }
+  };
   $("mode-save").onclick = async () => {
     const button = $("mode-save");
     button.disabled = true;
@@ -105,11 +111,17 @@ export function modeControls(getDetail, reload, safely) {
   };
   function render(detail) {
     if (!detail) return;
-    $("agent-mode").value = detail.agent_mode;
-    $("agent-mode").disabled = detail.running || savingSelection;
+    const profile = profiles.find((p) => p.agent_mode === detail.agent_mode);
+    $("mode-details").textContent = profile?.label || ({
+      manual: "Manual · 手动确认",
+      accept_edit: "Accept Edit · 自动编辑",
+      plan: "Plan · 只读规划",
+      auto: "Auto · 沙箱自动执行",
+    })[detail.agent_mode] || modeName(detail.agent_mode);
+    $("mode-view").disabled = detail.running || savingSelection;
     $("mode-details").title = detail.running
       ? "查看本轮模式；修改补充指令在下轮生效"
-      : "查看权限与编辑补充指令";
+      : "选择执行模式，查看权限与指令";
   }
-  return { render, selected: () => $("agent-mode").value };
+  return { render, selected: () => getDetail()?.agent_mode || "manual" };
 }

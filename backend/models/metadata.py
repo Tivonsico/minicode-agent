@@ -1,6 +1,7 @@
 """Bounded metadata reads; credentials go only to the configured endpoint."""
 
 import json
+from dataclasses import replace
 from urllib.parse import quote
 
 import httpx
@@ -26,6 +27,7 @@ def from_endpoint(config, client):
     base = config.base_url.rstrip("/")
     headers = {"Authorization": "Bearer " + config.api_key}
     urls = [base + "/models/" + quote(config.model, safe=""), base + "/models"]
+    result = None
     for url in urls:
         try:
             status, data = read_json(client, url, headers=headers)
@@ -40,9 +42,19 @@ def from_endpoint(config, client):
                 if isinstance(item, dict) and item.get("id") == config.model:
                     capability = ModelCapabilities.from_metadata(item, "endpoint:" + url)
                     if capability:
-                        return capability
+                        if result is None:
+                            result = capability
+                        else:
+                            result = replace(
+                                result,
+                                max_output=result.max_output or capability.max_output,
+                                max_input=result.max_input or capability.max_input,
+                                source=result.source + ";limits=" + capability.source,
+                            )
+                        if result.max_output is not None:
+                            return result
         except (httpx.HTTPError, ValueError) as exc:
             if isinstance(exc, ConfigError):
                 raise
             continue
-    return None
+    return result

@@ -160,7 +160,7 @@ def test_read_only_work_does_not_require_mutation_verification():
     assert not completion_check(events, "new")["required"]
 
 
-async def test_new_successful_edit_invalidates_checkpoint_verification(tmp_path):
+async def test_new_successful_edit_invalidates_verification_evidence(tmp_path):
     from backend.config import Config
 
     sandbox = SimpleNamespace(executable="/bin/false", available=lambda: False, reason="test")
@@ -173,8 +173,155 @@ async def test_new_successful_edit_invalidates_checkpoint_verification(tmp_path)
     )
     session.publish("verification_result", status="passed", call_id="check", source="execution")
     session.publish("tool_result", name="EditFile", status="failed", call_id="rejected")
-    assert session.checkpoints.snapshot()["verification_status"] == "passed"
+    assert completion_check(session.store.view, None)["reason"] == "no_file_mutation"
     session.publish("tool_result", name="EditFile", status="succeeded", call_id="write")
-    assert session.checkpoints.snapshot()["verification_status"] == "stale"
-    checkpoint = session.checkpoints.capture()
-    assert checkpoint["state"]["verification_status"] == "stale"
+    assert completion_check(session.store.view, None)["reason"] == "verification_stale"
+
+
+async def test_text_write_readback_finishes_once_without_shell(tmp_path):
+    from backend.storage.output_store import OutputStore
+    from backend.tools.executor import ToolExecutor
+
+    provider = ScriptedProvider([
+        action("WriteFile", "write", path="note.txt", content="哈基米南北绿豆\n"),
+        action("ReadFile", "read", path="note.txt"),
+        final(), final(), final(),
+    ])
+    loop, store, _ = make_loop(tmp_path, provider)
+
+    async def approve(_):
+        return True
+
+    executor = ToolExecutor(tmp_path, OutputStore(store), approve,
+                            emit=lambda kind, **data: store.append(kind, **data))
+    executor.shell_backend = SimpleNamespace(available=lambda: True)
+    loop.executor = executor
+    assert await loop.run("创建TXT，写入一行并读取确认") == "completed"
+    assert (tmp_path / "note.txt").read_text() == "哈基米南北绿豆\n"
+    replies = [e for e in store.events if e["type"] == "message"
+               and e.get("role") == "assistant" and not e.get("tool_calls")]
+    assert [e["content"] for e in replies] == ["完成"]
+    assert loop.requests == 3
+
+
+async def test_blocked_completion_is_not_replayed_as_another_user_turn(tmp_path):
+    from backend.conversation.projection import project_messages
+
+    provider = ScriptedProvider([
+        action("EditFile", "write", path="solution.py"),
+        final(), final(), final(),
+    ])
+    executor = EvidenceExecutor()
+    loop, store, _ = make_loop(tmp_path, provider, executor)
+    executor.store = store
+    assert await loop.run("修复功能") == "paused"
+    history = project_messages(store.events)
+    replies = [m["content"] for m in history if m["role"] == "assistant"
+               and not m.get("tool_calls")]
+    assert len(replies) == 1
+    assert "验证" in replies[0] and "完成" != replies[0]
+    for messages in provider.messages[2:]:
+        assert messages[-1]["role"] == "tool"
+        assert "完成前核对未通过" in messages[0]["content"]
+
+
+async def test_readback_cannot_replace_code_tests_or_cover_an_unread_file(tmp_path):
+    from backend.storage.output_store import OutputStore
+    from backend.tools.executor import ToolExecutor
+
+    for folder, responses in [
+        ("code", [action("WriteFile", "write", path="main.py", content="raise RuntimeError()"),
+                  action("ReadFile", "read", path="main.py")]),
+        ("partial", [action("WriteFile", "write", path="note.txt", content="first\nsecond\n"),
+                     action("ReadFile", "read", path="note.txt", line_count=1)]),
+        ("unread", [action("WriteFile", "first", path="first.txt", content="first"),
+                    action("WriteFile", "second", path="second.txt", content="second"),
+                    action("ReadFile", "read", path="second.txt")]),
+    ]:
+        root = tmp_path / folder
+        root.mkdir()
+        provider = ScriptedProvider(responses + [final(), final(), final()])
+        loop, store, _ = make_loop(root, provider)
+
+        async def approve(_):
+            return True
+
+        executor = ToolExecutor(root, OutputStore(store), approve,
+                                emit=lambda kind, **data: store.append(kind, **data))
+        executor.shell_backend = SimpleNamespace(available=lambda: True)
+        loop.executor = executor
+        assert await loop.run("按要求修改并验证") == "paused", folder
+        checks = [e for e in store.events if e["type"] == "completion_check"]
+        assert all(not e["accepted"] for e in checks), folder
+
+
+async def test_passing_code_test_can_be_followed_by_verified_text_note(tmp_path):
+    class MixedExecutor(EvidenceExecutor):
+        async def execute_batch(self, calls):
+            results = await super().execute_batch(calls)
+            if calls[0]["function"]["name"] == "ReadFile":
+                write = next(e for e in reversed(self.store.events)
+                             if e["type"] == "tool_result" and e.get("call_id") == "note")
+                self.store.append("file_verification_result", status="passed", source="readback",
+                                  mutations=[{"call_id": "note", "request_id": write["request_id"]}])
+            return results
+
+    provider = ScriptedProvider([
+        action("EditFile", "code", path="main.py"),
+        action("Shell", "test", command="pass", purpose="verification"),
+        action("WriteFile", "note", path="note.txt", content="tested"),
+        action("ReadFile", "read", path="note.txt"),
+        final(), final(), final(),
+    ])
+    executor = MixedExecutor()
+    loop, store, _ = make_loop(tmp_path, provider, executor)
+    executor.store = store
+    assert await loop.run("修复代码、测试并写入说明TXT") == "completed"
+    checks = [e for e in store.events if e["type"] == "completion_check"]
+    assert all(e["accepted"] for e in checks)
+    assert any(e["review_requested"] for e in checks)
+
+
+async def test_build_script_with_txt_suffix_still_requires_tests(tmp_path):
+    from backend.storage.output_store import OutputStore
+    from backend.tools.executor import ToolExecutor
+
+    provider = ScriptedProvider([
+        action("WriteFile", "write", path="CMakeLists.txt", content="invalid_command()"),
+        action("ReadFile", "read", path="CMakeLists.txt"),
+        final(), final(), final(),
+    ])
+    loop, store, _ = make_loop(tmp_path, provider)
+
+    async def approve(_):
+        return True
+
+    executor = ToolExecutor(tmp_path, OutputStore(store), approve,
+                            emit=lambda kind, **data: store.append(kind, **data))
+    executor.shell_backend = SimpleNamespace(available=lambda: True)
+    loop.executor = executor
+    assert await loop.run("修改构建脚本") == "paused"
+    assert all(not e["accepted"] for e in store.events if e["type"] == "completion_check")
+
+
+async def test_long_text_can_be_verified_in_multiple_read_ranges(tmp_path):
+    from backend.storage.output_store import OutputStore
+    from backend.tools.executor import ToolExecutor
+
+    provider = ScriptedProvider([
+        action("WriteFile", "write", path="note.txt", content="text\n" * 2001),
+        action("ReadFile", "read-start", path="note.txt", line_count=2000),
+        action("ReadFile", "read-end", path="note.txt", start_line=2001),
+        final(), final(), final(),
+    ])
+    loop, store, _ = make_loop(tmp_path, provider)
+
+    async def approve(_):
+        return True
+
+    executor = ToolExecutor(tmp_path, OutputStore(store), approve,
+                            emit=lambda kind, **data: store.append(kind, **data))
+    executor.shell_backend = SimpleNamespace(available=lambda: True)
+    loop.executor = executor
+    assert await loop.run("创建长TXT并分段读取确认") == "completed"
+    assert loop.requests == 4

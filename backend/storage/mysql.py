@@ -36,7 +36,7 @@ DDL = (
         session_id VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
         seq BIGINT NOT NULL, event_id CHAR(32) NOT NULL, body LONGTEXT NOT NULL,
         PRIMARY KEY(session_id, seq), UNIQUE KEY(event_id)) ENGINE=InnoDB""",
-    """CREATE TABLE IF NOT EXISTS mc_checkpoints (
+    """CREATE TABLE IF NOT EXISTS mc_journal_snapshots (
         session_id VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
         covered_seq BIGINT NOT NULL, body LONGTEXT NOT NULL) ENGINE=InnoDB""",
     """CREATE TABLE IF NOT EXISTS mc_operations (

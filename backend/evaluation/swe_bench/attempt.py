@@ -109,7 +109,7 @@ async def execute(service, env, task, work, artifact, options, profile, global_p
                 mode_profile=profile,
             )
             await settle(session, options.approval_behavior)
-            status = session.checkpoints.snapshot()["status"]
+            status = session.loop.status
     except TimeoutError:
         status, error = "timeout", "Agent 超过本次时间上限"
     finally:

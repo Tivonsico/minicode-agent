@@ -3,8 +3,7 @@ import { request } from "../api.js";
 import { element } from "../messages.js";
 import { $, disclosure, download, duration, empty, time } from "./shared.js";
 import { logViewer } from "./logs.js";
-import { checkpointViewer } from "./checkpoints.js";
-import { stateEditor } from "./state.js";
+import { recoveryViewer } from "./recovery.js";
 import { memoryEditor } from "./memory.js";
 
 export function inspection(getDetail, reloadSession) {
@@ -21,8 +20,7 @@ export function inspection(getDetail, reloadSession) {
     }
   }
   const loadLogs = logViewer(getSession, safely);
-  const renderCheckpoints = checkpointViewer(getSession, refresh, safely);
-  const renderState = stateEditor(getSession, refresh, safely);
+  const renderRecovery = recoveryViewer(getSession, refresh, safely);
   const loadMemory = memoryEditor(getDetail, safely);
   async function refresh() {
     const currentGeneration = ++generation;
@@ -79,8 +77,7 @@ export function inspection(getDetail, reloadSession) {
     }
     if (!data.summaries.length)
       empty(summaries, "尚未触发摘要压缩。上下文接近预算后，摘要会自动保存。");
-    renderCheckpoints(data);
-    renderState(data);
+    renderRecovery(data);
     if (selected === "logs") await loadLogs();
     if (selected === "memory") await loadMemory();
   }

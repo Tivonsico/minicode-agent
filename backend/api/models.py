@@ -60,14 +60,6 @@ class SkillInstallInput(Payload):
     project_path: str | None = None
 
 
-class CheckpointStateInput(Payload):
-    expected_seq: int = Field(ge=0)
-    objective: str = Field(max_length=100000)
-    notes: str = Field(default="", max_length=10000)
-    next_step: str = Field(default="", max_length=10000)
-    status: str = Field(pattern="^(idle|running|completed|interrupted|paused|failed)$")
-
-
 class ReconcileInput(Payload):
     processes_stopped: bool
     result_seq: int = Field(ge=1)

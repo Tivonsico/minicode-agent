@@ -43,6 +43,7 @@
         ></button>
         <h1 id="session-title">新会话</h1>
         <span id="run-status" class="badge">就绪</span>
+        <button id="snapshots-open" class="text-button" title="查看文件差异、历史及恢复">文件改动</button>
         <button
           id="inspect-toggle"
           class="icon-only workspace-toggle"
@@ -86,20 +87,10 @@
               aria-label="任务内容"
             ></textarea>
             <div class="composer-mode">
-              <select id="agent-mode" aria-label="执行模式" title="执行模式">
-                <option value="manual">Manual · 手动确认</option>
-                <option value="accept_edit">Accept Edit · 自动编辑</option>
-                <option value="plan">Plan · 只读规划</option>
-                <option value="auto">Auto · 沙箱自动执行</option>
-              </select>
-              <button id="mode-details" type="button" class="text-button">
-                权限与指令
+              <button id="mode-details" type="button" class="text-button" aria-haspopup="dialog" aria-controls="mode-dialog" title="模式与权限">
+                Manual · 手动确认
               </button>
-              <span class="persistence-modes" aria-label="存储并发模式说明">
-                <button type="button" id="local-mode-help" class="text-button" aria-haspopup="dialog">低并发模式：本地</button>
-                <span aria-hidden="true">/</span>
-                <button type="button" id="mysql-mode-help" class="text-button" aria-haspopup="dialog">高并发模式：MySQL</button>
-              </span>
+              <button type="button" id="concurrency-mode" class="text-button" aria-haspopup="dialog" aria-controls="persistence-dialog">并发模式：…</button>
             </div>
             <div class="composer-bottom">
               <button
@@ -254,8 +245,15 @@
             </div>
             <div id="swe-reports"></div>
           </div>
+          <div id="experiment-library" hidden>
+            <nav id="experiment-cases" aria-label="实验记录"></nav>
+          </div>
         </aside>
         <div class="evaluation-workbench">
+          <section id="local-conversation" aria-label="本地任务对话" hidden></section>
+          <section id="experiment-workbench" aria-label="实验对话详情" hidden>
+            <div id="experiment-detail"></div>
+          </section>
           <section id="swe-bench-setup" hidden>
             <div class="section-title">
               官方任务评测 <span id="swe-count"></span>
@@ -411,6 +409,8 @@
             </div>
             <p id="benchmark-progress" class="subtle" role="status"></p>
           </section>
+          <details id="case-editor-panel" hidden>
+          <summary>编辑任务与验收条件</summary>
           <form id="case-form">
             <div class="section-title">
               任务详情<button
@@ -534,6 +534,7 @@
               <button class="primary">保存评测集</button>
             </div>
           </form>
+          </details>
           <section id="evaluation-report" hidden>
             <div class="section-title">
               <span id="report-heading"></span>
@@ -600,18 +601,11 @@
           摘要历史</button
         ><button
           role="tab"
-          id="inspection-tab-checkpoints"
-          aria-controls="inspection-pane-checkpoints"
-          data-inspection-tab="checkpoints"
+          id="inspection-tab-recovery"
+          aria-controls="inspection-pane-recovery"
+          data-inspection-tab="recovery"
         >
-          检查点</button
-        ><button
-          role="tab"
-          id="inspection-tab-state"
-          aria-controls="inspection-pane-state"
-          data-inspection-tab="state"
-        >
-          检查点状态</button
+          执行恢复</button
         ><button
           role="tab"
           id="inspection-tab-memory"
@@ -647,8 +641,6 @@
           <option>tool_result</option>
           <option>approval_requested</option>
           <option>verification_result</option>
-          <option>task_state</option>
-          <option>checkpoint</option>
           <option>assistant_delta</option>
         </select>
         <div id="log-records"></div>
@@ -665,67 +657,14 @@
         <div id="summary-records"></div>
       </section>
       <section
-        id="inspection-pane-checkpoints"
+        id="inspection-pane-recovery"
         role="tabpanel"
-        aria-labelledby="inspection-tab-checkpoints"
-        data-inspection-pane="checkpoints"
+        aria-labelledby="inspection-tab-recovery"
+        data-inspection-pane="recovery"
         hidden
       >
-        <div class="page-heading">
-          <p class="subtle">
-            同步会立即保存当前检查点状态。执行中的任务保持
-            running；不会回退文件或重新执行工具。
-          </p>
-          <button id="checkpoint-sync">同步当前状态</button>
-        </div>
-        <p class="subtle" id="checkpoint-recovery"></p>
+        <p class="subtle" id="journal-recovery"></p>
         <div id="unresolved-operations"></div>
-        <div id="checkpoint-records"></div>
-      </section>
-      <section
-        id="inspection-pane-state"
-        role="tabpanel"
-        aria-labelledby="inspection-tab-state"
-        data-inspection-pane="state"
-        hidden
-      >
-        <form id="state-form">
-          <label class="field-label" for="state-objective">当前目标</label
-          ><textarea
-            id="state-objective"
-            rows="3"
-            maxlength="100000"
-          ></textarea>
-          <div class="form-columns">
-            <div>
-              <label class="field-label" for="state-next">下一步</label
-              ><textarea id="state-next" rows="3" maxlength="10000"></textarea>
-            </div>
-            <div>
-              <label class="field-label" for="state-notes">备注</label
-              ><textarea id="state-notes" rows="3" maxlength="10000"></textarea>
-            </div>
-          </div>
-          <label class="field-label" for="state-status">任务标记</label
-          ><select id="state-status">
-            <option value="idle">就绪</option>
-            <option value="running">执行中</option>
-            <option value="completed">已结束</option>
-            <option value="paused">已暂停</option>
-            <option value="interrupted">已中断</option>
-            <option value="failed">失败</option>
-          </select>
-          <p class="subtle">
-            手动更新保留来源记录。修改目标和备注不改写已提交的用户消息；执行事实与验证结果不能通过任务标记覆盖。
-          </p>
-          <details class="record-item">
-            <summary>查看系统维护的状态</summary>
-            <pre id="state-evidence"></pre>
-          </details>
-          <div class="dialog-actions">
-            <button class="primary">更新检查点状态</button>
-          </div>
-        </form>
       </section>
       <section
         id="inspection-pane-memory"
@@ -785,9 +724,10 @@
         </div>
       </form>
     </dialog>
-    <dialog id="mode-dialog">
-      <h2>执行模式</h2>
-      <select id="mode-view" aria-label="查看模式"></select>
+    <dialog id="mode-dialog" aria-labelledby="mode-title">
+      <h2 id="mode-title">模式与权限</h2>
+      <label class="field-label" for="mode-view">执行模式</label>
+      <select id="mode-view" aria-label="执行模式"></select>
       <h3>固定权限</h3>
       <div id="mode-policy"></div>
       <details>

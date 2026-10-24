@@ -3,8 +3,8 @@
 import json
 
 from backend.context.system_prompt import SYSTEM_PROMPT
-from backend.conversation.store import atomic_json, internal_directory
 from backend.observability.inputs import digest
+from backend.storage.files import atomic_json, internal_directory
 
 from .catalog import HARD_BOUNDARIES, MODES, POLICY_VERSION, READ_TOOLS, validate
 

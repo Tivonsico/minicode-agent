@@ -101,7 +101,7 @@ async def execute(service, case, options, repeat, artifact, *, mode_profile, glo
                         mode_profile=mode_profile,
                     )
                     await settle(session, options.approval_behavior)
-                    status = session.checkpoints.snapshot()["status"]
+                    status = session.loop.status
                     stage = {"index": index + 1, "status": status}
                     # Test retained requirements after each turn, not just the final answer.
                     if case["category"] == "multiturn" and index < len(case["prompts"]) - 1:

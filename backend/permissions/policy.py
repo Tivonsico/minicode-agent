@@ -30,9 +30,12 @@ class PermissionPolicy:
         validate(mode)
         if not boundary_ok:
             return Decision(Action.DENY, "Resource boundary denied this operation.")
+        if tool_name == "S2Effect":
+            action = Action.DENY if mode == "plan" else Action.ASK
+            return Decision(action, "Explicit local S2 fixture approval required.")
         if tool_name in self.READ:
             return Decision(Action.ALLOW)
-        if tool_name in self.MUTATE or tool_name == "Shell":
+        if tool_name in self.MUTATE or tool_name in {"Shell", "GmailPrepareEmail", "GmailSendEmail"}:
             action = Action(MODES[mode]["actions"][tool_name])
             return Decision(action, f"{mode} mode: {tool_name} is {action.value}.")
         return Decision(Action.DENY, "Unknown operation.")

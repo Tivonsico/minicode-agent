@@ -1,6 +1,7 @@
 import { request, post } from "../api.js";
 import { modeName } from "../modes.js";
 import { element } from "../messages.js";
+import { attachRunConversation } from "./conversation.js";
 import {
   $,
   disclosure,
@@ -143,6 +144,10 @@ export function reports(safely, refreshReports) {
           );
       });
       if (benchmark) {
+        const task = report.dataset?.cases?.find(case_ => case_.id === result.case_id) || { name: result.case_name };
+        attachRunConversation(item, () => result.artifact_ref
+          ? request(`/evaluations/jobs/${report.job_id || report.id}/attempts/${index}`)
+          : Promise.resolve({ events: [] }), { task, result }, safely);
         item.append(
           disclosure("阶段与运行指标", {
             agent_mode: result.agent_mode,
@@ -163,7 +168,7 @@ export function reports(safely, refreshReports) {
         if (result.artifact_ref) {
           const button = element(
             "button",
-            "查看初始文件、最终文件与执行记录",
+            "查看文件与原始请求附件",
             "text-button",
           );
           button.onclick = () =>
@@ -177,7 +182,7 @@ export function reports(safely, refreshReports) {
                 item.append(
                   disclosure("初始文件", artifact.initial),
                   disclosure("最终文件", artifact.final),
-                  disclosure("执行记录", artifact.events),
+                  disclosure("原始事件附件", artifact.events),
                 );
                 const inputs = artifact.events.filter(
                   (e) => e.type === "request_start" && e.input_ref,
@@ -209,6 +214,12 @@ export function reports(safely, refreshReports) {
             });
           item.append(button);
         }
+      } else if (result.session_id) {
+        const source = report.sources?.find(entry => entry.session_id === result.session_id);
+        const task = report.dataset?.cases?.find(case_ => case_.id === result.case_id) || { name: result.case_name, mode: "history" };
+        attachRunConversation(item, () => source
+          ? request(`/evaluations/source-conversations/${result.session_id}?covered_seq=${source.covered_seq}&turn_id=${encodeURIComponent(result.turn_id)}`)
+          : Promise.resolve({ events: [] }), { task, result }, safely);
       }
       results.append(item);
     });

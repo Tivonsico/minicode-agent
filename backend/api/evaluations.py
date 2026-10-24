@@ -2,6 +2,7 @@
 
 from fastapi import HTTPException, Query
 
+from backend.evaluation.experiments import ExperimentRepository
 from backend.evaluation.jobs import BenchmarkJobs
 from backend.evaluation.models import BenchmarkInput, DatasetInput, EvaluationInput, ImportInput
 from backend.evaluation.regrade import regrade
@@ -14,8 +15,31 @@ from .nonblocking import Router
 def evaluation_router(service, session):
     api = Router(prefix="/evaluations")
     repository = EvaluationRepository(service.config.root)
+    experiments = service.experiments = ExperimentRepository(service.config.root)
     jobs = BenchmarkJobs(service, repository)
     service.evaluations = jobs
+
+    @api.get('/experiments')
+    async def experiment_records(category: str | None = Query(default=None)):
+        if category not in {None, 'compaction', 'recovery'}:
+            raise HTTPException(422, '未知实验分类')
+        return experiments.list(category)
+
+    @api.get('/experiments/{identifier}')
+    async def experiment_record(identifier: str):
+        try:
+            return experiments.get(identifier)
+        except FileNotFoundError:
+            raise HTTPException(404, '实验记录不存在') from None
+
+    @api.get('/source-conversations/{sid}')
+    async def source_conversation(sid: str, covered_seq: int = Query(ge=0), turn_id: str | None = None):
+        visible = {'message', 'run_accepted', 'tool_start', 'tool_running', 'tool_result',
+                   'operation_reconciled', 'turn_end'}
+        events = [event for event in session(sid).store.events
+                  if event['seq'] <= covered_seq and event['type'] in visible
+                  and (turn_id is None or event.get('turn_id') == turn_id)]
+        return {'events': events, 'covered_seq': covered_seq}
 
     @api.get("/dataset")
     async def dataset():

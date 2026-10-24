@@ -98,3 +98,19 @@ def test_manager_prevents_concurrent_rounds_and_duplicate_finish(tmp_path):
     assert len([e for e in store.events if e["type"] == "turn_end"]) == 1
     manager.start("new question")
     assert manager.active
+
+
+def test_deferred_completion_stays_out_of_history_after_checkpoint_and_recovery(tmp_path):
+
+    store = SessionStore(tmp_path)
+    store.append("turn_start", turn_id="old")
+    store.append("completion_check", turn_id="old", message_id="candidate", status="blocked")
+    store.append("message", turn_id="old", message_id="candidate", role="assistant", content="完成")
+    store.append("turn_end", turn_id="old", status="paused")
+    store.append("turn_start", turn_id="new")
+    store.append("assistant_delta", turn_id="new", message_id="deferred", kind="text", content="完成")
+    store.append("completion_deferred", turn_id="new", message_id="deferred", content="完成")
+    store.save_snapshot()
+    restored = recover_session(SessionStore(tmp_path, store.session_id))
+    assert project_messages(restored.events) == []
+    assert project_messages(restored.view) == []

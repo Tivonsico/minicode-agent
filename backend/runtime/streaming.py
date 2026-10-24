@@ -1,7 +1,39 @@
 """SSE framing and OpenAI tool-call delta assembly."""
 
 import json
+import time
 from collections.abc import AsyncIterator
+
+
+class StreamJournal:
+    """Coalesce small deltas; publish only after each chunk is durable."""
+
+    def __init__(self, emit):
+        self.emit = emit
+        self.pending = None
+        self.size = 0
+        self.last_flush = None
+
+    def add(self, event):
+        if self.pending and (self.pending["type"], self.pending.get("request_id")) != (
+            event["type"], event.get("request_id")
+        ):
+            self.flush()
+        if self.pending is None:
+            self.pending = {**event, "content": [] if event["type"] == "tool_delta" else ""}
+        self.pending["content"] += event.get("content", [] if event["type"] == "tool_delta" else "")
+        self.size += len(str(event.get("content", "")))
+        if (self.last_flush is None or self.size >= 256
+                or time.monotonic() - self.last_flush >= 0.05):
+            self.flush()
+
+    def flush(self):
+        if self.pending is None:
+            return
+        self.emit(self.pending)
+        self.pending = None
+        self.size = 0
+        self.last_flush = time.monotonic()
 
 
 async def sse_events(lines: AsyncIterator[str]) -> AsyncIterator[str]:

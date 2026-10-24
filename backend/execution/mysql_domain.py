@@ -5,7 +5,7 @@ mode and another database from bypassing the authoritative MySQL workspace claim
 """
 import json
 
-from backend.conversation.store import atomic_json, sync_directory
+from backend.storage.files import atomic_json, sync_directory
 from backend.tools.base import ToolError
 
 from . import gate

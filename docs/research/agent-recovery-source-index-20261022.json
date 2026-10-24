@@ -1,0 +1,439 @@
+{
+  "date": "2026-10-22",
+  "method": "Read-only inspection of fixed GitHub source, tests and first-party docs via GitHub connector. No upstream suites or fault-injection/model experiments executed.",
+  "repositories": [
+    {
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "tree": "f127f0f96a815eac4dea336a2ae0d9cd0f2aa82d",
+      "url": "https://github.com/deepseek-ai/deepseek-harness/commit/687f282e8625c6b8d11ff58211a90524be2e4317",
+      "commit_date": "2026-10-17T07:22:43Z"
+    },
+    {
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "tree": "dfebc964bab276e9dcbefa5644278b62f045acf2",
+      "url": "https://github.com/openai/codex/commit/8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "commit_date": "2026-10-18T01:58:02Z"
+    },
+    {
+      "commit": "3cd57c038ad827d05f80c6488adea9994156c58c",
+      "tree": "a8aa3b138b6036c25331712af8ed8b3f0a4a0fda",
+      "url": "https://github.com/langchain-ai/langgraph/commit/3cd57c038ad827d05f80c6488adea9994156c58c",
+      "commit_date": "2026-10-21T12:22:40Z"
+    },
+    {
+      "commit": "23152b1133e7759381661e93bcdca778101a80bc",
+      "tree": "a9dc52d5f7d5fafafbc6a1c0d21cde09b60dac93",
+      "url": "https://github.com/langchain-ai/docs/commit/23152b1133e7759381661e93bcdca778101a80bc"
+    }
+  ],
+  "files": [
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/stream_events_utils.rs",
+      "blob_sha": "2081c42cd2c828864d1672c0603eacf54a71320d",
+      "line_count": 580,
+      "read_success": true,
+      "cited_start_lines": [
+        315
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/stream_events_utils.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/session/turn.rs",
+      "blob_sha": "8925df02baa224bea27785b6e8c2653b4c80f334",
+      "line_count": 3334,
+      "read_success": true,
+      "cited_start_lines": [
+        2804,
+        2568,
+        3283,
+        1739
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/session/turn.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/session/rollout_reconstruction.rs",
+      "blob_sha": "7c8ae88b5dd59674df284c49c13cc4d99b614b54",
+      "line_count": 656,
+      "read_success": true,
+      "cited_start_lines": [
+        208
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/session/rollout_reconstruction.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/context_manager/history.rs",
+      "blob_sha": "f39be3fb41fee1371036f393d5d1f62057225b60",
+      "line_count": 1406,
+      "read_success": true,
+      "cited_start_lines": [
+        968
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/context_manager/history.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/context_manager/normalize.rs",
+      "blob_sha": "387bc8f75a2249be67efc44584b92585b6de57bb",
+      "line_count": 432,
+      "read_success": true,
+      "cited_start_lines": [
+        46
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/context_manager/normalize.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/rollout/src/recorder.rs",
+      "blob_sha": "765d83ccc7df4b136c04774930f4ac65af15bbd5",
+      "line_count": 2267,
+      "read_success": true,
+      "cited_start_lines": [
+        1083,
+        1834,
+        1908
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/rollout/src/recorder.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/tools/executed_tool_calls.rs",
+      "blob_sha": "853c88a9727ee7e0892b1f8f7276b47175a8a8f0",
+      "line_count": 759,
+      "read_success": true,
+      "cited_start_lines": [
+        1
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/tools/executed_tool_calls.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/tools/parallel.rs",
+      "blob_sha": "e0b50c48dd7ed4558b4423d25bae6e62d99ccea5",
+      "line_count": 884,
+      "read_success": true,
+      "cited_start_lines": [
+        51,
+        202
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/tools/parallel.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/responses_retry.rs",
+      "blob_sha": "048a68bfc9bc7b80a88c1a9541a413b7a37ccd95",
+      "line_count": 211,
+      "read_success": true,
+      "cited_start_lines": [
+        23,
+        87
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/responses_retry.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/client.rs",
+      "blob_sha": "981e015434d63b85d5880626c17217b2ae3b5b2c",
+      "line_count": 3092,
+      "read_success": true,
+      "cited_start_lines": [
+        1496,
+        2137
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/client.rs"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/core/agent-loop/src/agent.ts",
+      "blob_sha": "adf2e33ddcc9b37e8e20e89203a276bcdf18ee5d",
+      "line_count": 706,
+      "read_success": true,
+      "cited_start_lines": [
+        504,
+        406
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/core/agent-loop/src/agent.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/core/agent-loop/src/tool-calls.ts",
+      "blob_sha": "c12de68d195eb3af411d2a79537e33a893ec852e",
+      "line_count": 291,
+      "read_success": true,
+      "cited_start_lines": [
+        146
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/core/agent-loop/src/tool-calls.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/session/session-checkpoint-policy/src/index.ts",
+      "blob_sha": "0fc456eb08853b9fe54d0bf9ca3a26c05b4413cf",
+      "line_count": 84,
+      "read_success": true,
+      "cited_start_lines": [
+        20
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/session/session-checkpoint-policy/src/index.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "docs/subsystems/persistence.md",
+      "blob_sha": "3c0c2586a718ddcafb9e6c108b9040e852113954",
+      "line_count": 419,
+      "read_success": true,
+      "cited_start_lines": [
+        65
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/docs/subsystems/persistence.md"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/core/agent-loop/src/index.ts",
+      "blob_sha": "ca4532af8c8007cab304e8838a07b0c83f384278",
+      "line_count": 930,
+      "read_success": true,
+      "cited_start_lines": [
+        875
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/core/agent-loop/src/index.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/core/session/src/repair.ts",
+      "blob_sha": "bb32f01ca06af2c496fa4c68fed287297e1b7fce",
+      "line_count": 212,
+      "read_success": true,
+      "cited_start_lines": [
+        29,
+        100
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/core/session/src/repair.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/session/session-persistence-jsonl/src/lease.ts",
+      "blob_sha": "59dfe27fcacc9943ae0eda8fe7bde4d136c86afb",
+      "line_count": 136,
+      "read_success": true,
+      "cited_start_lines": [
+        1
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/session/session-persistence-jsonl/src/lease.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/llm/llm-retry/src/index.ts",
+      "blob_sha": "89ffc14c40d937af31499a2a945dfbabfe6100af",
+      "line_count": 260,
+      "read_success": true,
+      "cited_start_lines": [
+        155
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/llm/llm-retry/src/index.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/llm/token-meter/README.md",
+      "blob_sha": "51eee2f2aef4280818852db42635941963f103be",
+      "line_count": 160,
+      "read_success": true,
+      "cited_start_lines": [
+        36
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/llm/token-meter/README.md"
+    },
+    {
+      "repository": "langchain-ai/langgraph",
+      "commit": "3cd57c038ad827d05f80c6488adea9994156c58c",
+      "path": "libs/langgraph/langgraph/pregel/_loop.py",
+      "blob_sha": "4f3d21538f25c8e87ab4ef0c4c233ecd74f4974e",
+      "line_count": 2167,
+      "read_success": true,
+      "cited_start_lines": [
+        822
+      ],
+      "url": "https://github.com/langchain-ai/langgraph/blob/3cd57c038ad827d05f80c6488adea9994156c58c/libs/langgraph/langgraph/pregel/_loop.py"
+    },
+    {
+      "repository": "langchain-ai/langgraph",
+      "commit": "3cd57c038ad827d05f80c6488adea9994156c58c",
+      "path": "libs/langgraph/langgraph/pregel/_runner.py",
+      "blob_sha": "6799d86bdaa1f697c9464304a75001088a83de13",
+      "line_count": 949,
+      "read_success": true,
+      "cited_start_lines": [
+        575,
+        752
+      ],
+      "url": "https://github.com/langchain-ai/langgraph/blob/3cd57c038ad827d05f80c6488adea9994156c58c/libs/langgraph/langgraph/pregel/_runner.py"
+    },
+    {
+      "repository": "langchain-ai/langgraph",
+      "commit": "3cd57c038ad827d05f80c6488adea9994156c58c",
+      "path": "libs/langgraph/langgraph/pregel/_retry.py",
+      "blob_sha": "79c4bdd48407cfdab93ed7c02f13566ddc41eecb",
+      "line_count": 848,
+      "read_success": true,
+      "cited_start_lines": [
+        600
+      ],
+      "url": "https://github.com/langchain-ai/langgraph/blob/3cd57c038ad827d05f80c6488adea9994156c58c/libs/langgraph/langgraph/pregel/_retry.py"
+    },
+    {
+      "repository": "langchain-ai/docs",
+      "commit": "23152b1133e7759381661e93bcdca778101a80bc",
+      "path": "src/oss/langgraph/functional-api.mdx",
+      "blob_sha": "9cb2faa36153c99495e1ed52d366f9179da66b07",
+      "line_count": 1034,
+      "read_success": true,
+      "cited_start_lines": [
+        794
+      ],
+      "url": "https://github.com/langchain-ai/docs/blob/23152b1133e7759381661e93bcdca778101a80bc/src/oss/langgraph/functional-api.mdx"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/responses_retry_tests.rs",
+      "blob_sha": "65aa29397c5f5524116b0b9f932ab3719e1ed488",
+      "line_count": 101,
+      "read_success": true,
+      "cited_start_lines": [
+        53
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/responses_retry_tests.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/tests/suite/retry_after.rs",
+      "blob_sha": "bceca6f5b40df9c4e1282b6fed7dd4dcb57ec1c8",
+      "line_count": 2224,
+      "read_success": true,
+      "cited_start_lines": [
+        1589
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/tests/suite/retry_after.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/core/src/context_manager/history_tests.rs",
+      "blob_sha": "70178c446f78bb419de5699bfe0f73bd8bd63170",
+      "line_count": 3567,
+      "read_success": true,
+      "cited_start_lines": [
+        2593
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/core/src/context_manager/history_tests.rs"
+    },
+    {
+      "repository": "openai/codex",
+      "commit": "8c076942cb70fba8e5c4732c23f1faabc4aed484",
+      "path": "codex-rs/rollout/src/recorder_tests.rs",
+      "blob_sha": "d8916fea98d4d4f0ec5d16a7cba41c77f1b45f2b",
+      "line_count": 1965,
+      "read_success": true,
+      "cited_start_lines": [
+        935
+      ],
+      "url": "https://github.com/openai/codex/blob/8c076942cb70fba8e5c4732c23f1faabc4aed484/codex-rs/rollout/src/recorder_tests.rs"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/session/session-checkpoint-policy/tests/session-checkpoint-policy.spec.ts",
+      "blob_sha": "654b1ab18f5f160436aa2d47f72e45cda0600837",
+      "line_count": 261,
+      "read_success": true,
+      "cited_start_lines": [
+        53
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/session/session-checkpoint-policy/tests/session-checkpoint-policy.spec.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/session/session-checkpoint-policy/tests/crash-recovery.e2e.ts",
+      "blob_sha": "06850e88690c113c532e5937312813d5acec8767",
+      "line_count": 121,
+      "read_success": true,
+      "cited_start_lines": [
+        92
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/session/session-checkpoint-policy/tests/crash-recovery.e2e.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/core/agent-loop/tests/resume.spec.ts",
+      "blob_sha": "287593936ed809fd0e0174598a0803067fbbbea6",
+      "line_count": 1407,
+      "read_success": true,
+      "cited_start_lines": [
+        479
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/core/agent-loop/tests/resume.spec.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/core/session/tests/repair.spec.ts",
+      "blob_sha": "f70b1ac83f476b403ee89e33cc8c1414c721d926",
+      "line_count": 448,
+      "read_success": true,
+      "cited_start_lines": [
+        135
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/core/session/tests/repair.spec.ts"
+    },
+    {
+      "repository": "deepseek-ai/deepseek-harness",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "path": "packages/session/session-persistence-jsonl/tests/lease.two-process.e2e.ts",
+      "blob_sha": "625d5f0a3803d8ac60282d465e33cc782200098e",
+      "line_count": 70,
+      "read_success": true,
+      "cited_start_lines": [
+        34
+      ],
+      "url": "https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/session/session-persistence-jsonl/tests/lease.two-process.e2e.ts"
+    },
+    {
+      "repository": "langchain-ai/langgraph",
+      "commit": "3cd57c038ad827d05f80c6488adea9994156c58c",
+      "path": "libs/langgraph/tests/test_pregel.py",
+      "blob_sha": "e7ff4bd1054979d778ce47d3b026fb3dd80faa34",
+      "line_count": 9862,
+      "read_success": true,
+      "cited_start_lines": [
+        891,
+        5909
+      ],
+      "url": "https://github.com/langchain-ai/langgraph/blob/3cd57c038ad827d05f80c6488adea9994156c58c/libs/langgraph/tests/test_pregel.py"
+    }
+  ]
+}

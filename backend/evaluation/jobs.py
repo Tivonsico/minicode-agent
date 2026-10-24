@@ -9,11 +9,12 @@ import uuid
 from pathlib import Path
 
 from backend.context.project_assets import ProjectAssets
-from backend.conversation.store import atomic_json, internal_directory, now
+from backend.conversation.metadata import now
 from backend.execution.python_runtime import python_runtime
 from backend.models.reasoning import validate
 from backend.modes.catalog import compatible
 from backend.modes.settings import ModeSettings
+from backend.storage.files import atomic_json, internal_directory
 
 from .attempt import execute
 from .metrics import summarize

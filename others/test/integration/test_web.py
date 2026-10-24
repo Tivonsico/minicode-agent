@@ -81,6 +81,15 @@ async def test_bootstrap_security_and_no_credentials(tmp_path):
         assert provider.calls == 0
 
 
+async def test_storage_settings_can_be_saved_with_an_open_local_session(tmp_path):
+    async with client(tmp_path) as (connection, service, _, _):
+        created = await connection.post("/api/sessions")
+        assert created.status_code == 201
+        response = await connection.put("/api/storage", json={"storage_mode": "local"})
+        assert response.status_code == 200
+        assert response.json()["active_mode"] == "local"
+
+
 async def test_run_survives_http_client_switch_and_cancel_preserves_partial(tmp_path):
     provider = ScriptedProvider()
     provider.block = asyncio.Event()
@@ -100,10 +109,10 @@ async def test_run_survives_http_client_switch_and_cancel_preserves_partial(tmp_
             headers={"X-Minicode-Token": app.state.token},
         ) as other:
             snapshot = (await other.get(f"/api/sessions/{sid}")).json()
-            assert snapshot["running"] and snapshot["state"]["objective"] == "一个慢任务"
+            assert snapshot["running"] and snapshot["messages"][-1]["content"] == "一个慢任务"
             assert provider.calls == 1
             ended = (await other.post(f"/api/sessions/{sid}/cancel")).json()
-            assert not ended["running"] and ended["state"]["status"] == "interrupted"
+            assert not ended["running"] and service.get(sid).loop.status == "interrupted"
         assert (await connection.get("/api/sessions")).json()[0]["title"] == "一个慢任务"
 
 
@@ -159,7 +168,7 @@ async def test_directory_approval_diff_single_use_and_completed_task(tmp_path):
         assert response.status_code == 200
         await until(lambda: not item.busy())
         assert target.read_text() == "after"
-        assert item.checkpoints.snapshot()["status"] == "completed"
+        assert item.loop.status == "completed"
         assert (
             await connection.post(
                 base + f"/approvals/{ticket['id']}",
@@ -208,7 +217,7 @@ async def test_reject_and_cancel_pending_approval_cannot_mutate(tmp_path):
             await until(lambda: not item.busy())
             assert not (project / "new.txt").exists()
             assert not item.approvals.listing()
-            assert item.checkpoints.snapshot()["status"] == (
+            assert item.loop.status == (
                 "interrupted" if accepted is None else "paused"
             )
 
@@ -280,7 +289,7 @@ async def test_event_replay_and_crash_recovery_never_reexecutes_tool(tmp_path):
             "assistant_delta", turn_id="t", message_id="a", kind="text", content="部分输出"
         )
         recovered = service.get("recovered")
-        assert recovered.checkpoints.snapshot()["status"] == "interrupted"
+        assert next(e for e in reversed(recovered.store.view) if e["type"] == "turn_end")["status"] == "interrupted"
         assert recovered.loop.conversation.messages()[-1]["content"].startswith("部分输出")
         assert provider.calls == 0
         response = event_response(recovered, 2)
@@ -297,7 +306,7 @@ async def test_cancel_before_scheduled_coroutine_starts_is_settled(tmp_path):
         item.start("尚未派发的任务")
         await item.cancel()
         assert not item.busy()
-        assert item.checkpoints.snapshot()["status"] == "interrupted"
+        assert item.loop.status == "interrupted"
         assert provider.calls == 0
 
 

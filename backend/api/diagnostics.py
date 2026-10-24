@@ -8,13 +8,8 @@ from backend.modes.catalog import tags
 from backend.observability.inputs import read_input
 from backend.observability.trajectory import export, project
 
-from .models import CheckpointStateInput, MemoryCreateInput, MemoryEditInput, ReconcileInput
+from .models import MemoryCreateInput, MemoryEditInput, ReconcileInput
 from .nonblocking import Router
-
-
-def state_revision(item):
-    item.checkpoints.snapshot()
-    return item.checkpoints.revision
 
 
 def diagnostics_router(service, session):
@@ -25,12 +20,9 @@ def diagnostics_router(service, session):
         item = session(sid)
         return {
             **project(item.store.events),
-            "state": item.checkpoints.snapshot(),
-            "state_revision": state_revision(item),
             "recovery": item.store.recovery_info,
             "unresolved_operations": unresolved_operations(item.store.view),
             "running": item.busy(),
-            "checkpoints": item.checkpoints.listing(),
             "summaries": [e for e in item.store.events if e["type"] == "context_compressed"],
             "milestones": [
                 e
@@ -81,25 +73,6 @@ def diagnostics_router(service, session):
             headers={"Content-Disposition": f'attachment; filename="trajectory-{sid}.json"'},
         )
 
-    @api.post("/sessions/{sid}/checkpoints/sync")
-    async def checkpoint(sid: str):
-        item = session(sid)
-        if item.busy():
-            item.checkpoints.update(status="running", source="manual_sync")
-        record = item.checkpoints.capture(
-            "manual", run_id=item.run_id, turn_id=item.checkpoints.snapshot()["turn_id"]
-        )
-        item.changed.set()
-        return record
-
-    @api.put("/sessions/{sid}/checkpoint-state")
-    async def update_state(sid: str, body: CheckpointStateInput):
-        item = session(sid)
-        changes = body.model_dump(exclude={"expected_seq"})
-        result = item.checkpoints.edit(body.expected_seq, changes, item.busy)
-        item.changed.set()
-        return result
-
     @api.post("/sessions/{sid}/operations/reconcile")
     async def reconcile(sid: str, body: ReconcileInput):
         item = session(sid)
@@ -113,6 +86,9 @@ def diagnostics_router(service, session):
         if not body.evidence.strip():
             raise HTTPException(422, "必须填写实际核实证据")
         async with item.executor.execution_gate(reconciliation=True) as lease:
+            from backend.recovery.operations import validate_native_resolution
+
+            validate_native_resolution(item.store, unknown, body.resolution)
             item.store.append(
                 "operation_reconciled",
                 result_seq=body.result_seq,
@@ -128,9 +104,6 @@ def diagnostics_router(service, session):
             remaining = unresolved_operations(item.store.view)
             if not remaining and item.executor.pause_reason == "termination_unknown":
                 item.executor.terminal_failed, item.executor.pause_reason = False, None
-            item.checkpoints.update(
-                status="paused", pending_tool=None, phase="ended", source="manual_reconciliation"
-            )
             lease.clear_for(item.store, unknown)
         item.changed.set()
         return {"unresolved_operations": remaining}

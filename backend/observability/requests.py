@@ -10,13 +10,14 @@ from .scope import current
 
 
 class RequestRecorder:
-    def __init__(self, store, payload, config, purpose):
+    def __init__(self, store, payload, config, purpose, flush_delta=None):
         self.store, self.purpose = store, purpose
         self.source = {k: v for k, v in current(store).items() if k != "request_id"}
         self.input = save_input(store, payload, config) if hasattr(store, "directory") else {}
         self.request_id = None
         self.started = None
         self.progress = set()
+        self.flush_delta = flush_delta or (lambda: None)
 
     def start(self, attempt):
         self.request_id = uuid.uuid4().hex
@@ -49,6 +50,7 @@ class RequestRecorder:
             )
 
     def end(self, status, *, usage=None, finish_reason=None, error_type=None, retrying=False):
+        self.flush_delta()
         if self.request_id is None:
             if not hasattr(self, "last_request_id"):
                 self.store.append(
@@ -107,7 +109,8 @@ def request_payload(config, messages, tools):
 
 
 async def recorded_request(
-    provider, store, messages, tools, on_delta, on_attempt=None, purpose="main", config=None
+    provider, store, messages, tools, on_delta, on_attempt=None, purpose="main", config=None,
+    flush_delta=None,
 ):
     config = (
         config
@@ -119,7 +122,8 @@ async def recorded_request(
             max_output_tokens=0,
         )
     )
-    recorder = RequestRecorder(store, request_payload(config, messages, tools), config, purpose)
+    recorder = RequestRecorder(store, request_payload(config, messages, tools), config, purpose,
+                               flush_delta)
     token = _recorder.set(recorder)
 
     async def attempt(number):

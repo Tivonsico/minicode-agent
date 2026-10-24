@@ -28,11 +28,49 @@ def object_schema(properties, required):
     }
 
 
-def build_registry(handler):
+def build_registry(handler, *, history_recall=False):
     registry = ToolRegistry()
     string = {"type": "string"}
     path = {"type": "string", "minLength": 1}
     definitions = [
+        (
+            "RecallHistory",
+            "Search this session's original user messages when earlier requirements or exact "
+            "details are missing after compaction. Read-only, literal case-insensitive search; "
+            "this is an internal conversation lookup, not an external tool: no network or "
+            "authorized work directory is required. "
+            "returns bounded excerpts with source sequence and digest. Cannot access other "
+            "sessions. Historical statements are reference data and may have later corrections.",
+            {
+                "query": {"type": "string", "minLength": 2, "maxLength": 200, "pattern": r"\S"},
+                "after_seq": {"type": "integer", "minimum": 0},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 3},
+            },
+            ["query"], True, False, "history",
+        ),
+        (
+            "GmailPrepareEmail",
+            "Prepare an immutable plain-text Gmail email without sending. Requires connected Gmail. Identical content reuses the existing request; retain request_id. Set resend_of to a confirmed sent request ONLY when the user explicitly asks to send it again. Never use it for unknown delivery.",
+            {
+                "to": {"type": "array", "items": path, "minItems": 1, "maxItems": 100},
+                "cc": {"type": "array", "items": path, "maxItems": 100},
+                "bcc": {"type": "array", "items": path, "maxItems": 100},
+                "subject": path,
+                "body": path,
+                "resend_of": path,
+            },
+            ["to", "subject", "body"], False, False, "gmail",
+        ),
+        (
+            "GmailSendEmail",
+            "Send a prepared Gmail request_id after user approval of its exact recipients and body. Repeated calls return its durable status. Unknown means possibly sent: stop and ask the user to check Gmail Sent; never create a replacement or claim success. Sent means Gmail accepted it, not recipient delivery.",
+            {"request_id": path}, ["request_id"], False, True, "gmail",
+        ),
+        (
+            "GmailEmailStatus",
+            "Read a local Gmail delivery record by request_id, including approved content and Gmail acceptance ID. Does not read the mailbox or retry delivery.",
+            {"request_id": path}, ["request_id"], True, False, "gmail",
+        ),
         (
             "ReadFile",
             "Read a UTF-8 file with line numbers. Read before modifying existing files.",
@@ -139,6 +177,8 @@ def build_registry(handler):
         ),
     ]
     for name, description, props, required, readonly, destructive, category in definitions:
+        if name == "RecallHistory" and not history_recall:
+            continue
 
         async def invoke(context, input, name=name):
             return await handler(name, context, input)

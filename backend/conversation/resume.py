@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 
+from backend.conversation.snapshot import discarded_message_ids
 from backend.conversation.snapshot import identity as event_identity
 from backend.modes.catalog import IDENTITY_FIELDS
 from backend.modes.catalog import tags as mode_tags
@@ -11,9 +12,7 @@ def recover_session(store):
     starts = [e for e in store.recovery_view if e["type"] == "turn_start"]
     ended = {e.get("turn_id") for e in store.recovery_view if e["type"] == "turn_end"}
     complete = {e["message_id"] for e in store.recovery_view if e["type"] == "message"}
-    discarded = {
-        e.get("message_id") for e in store.recovery_view if e["type"] == "request_recovery"
-    }
+    discarded = discarded_message_ids(store.recovery_view)
     partials = defaultdict(str)
     origins = {e["turn_id"]: e for e in starts}
     for event in store.recovery_view:

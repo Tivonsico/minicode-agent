@@ -1,57 +1,48 @@
-# 本地 checkpoint 恢复协议
+# 事件日志与上下文恢复
 
-2026-10-19。本地 JSONL 模式继续可用；MySQL 已接入实际执行，详见 [MySQL 协议](mysql.md)。
+2026-10-24。独立任务进度 Checkpoint 已移除，不再保存 objective、phase、notes、next_step，也不再向模型注入 runtime_state。原始 JSONL 或 MySQL 事件是执行事实来源，模型通过压缩摘要、后续消息和实际工作区理解任务。
 
-## 一个状态所有者
+## 接单和工具恢复
 
-`backend/checkpoint/manager.py` 的 `Checkpoints` 接管原 ShortMemory 的目标、阶段、请求次数、待审批工具、人工备注和验证状态。状态更新直接追加 checkpoint 事件并保存恢复快照，不再写独立 task_state.json。旧 journal 中的 task_state 事件仍可读取迁移，旧缓存文件不作为恢复依据。
+返回接单成功前，run_accepted 保存输入原文、稳定消息 ID、run/turn ID 与冻结模式配置。SessionStore 先追加、flush、fsync，再发布事件。写入结果不明时冻结 writer，重新打开后核验日志；恢复本身不会调用模型或执行工具。
 
-程序维护执行状态；模型摘要只负责压缩历史，不改变真实的工具状态。checkpoint 不包含任意项目文件的 undo，也不是进程栈或可重新执行的工具队列。
+恢复层读取 tool_start、tool_running、tool_result 和 operation_reconciled：
 
-## 接单和持久化
+- 已有可靠结果时保留结果，不因进程中断而覆盖成功或失败。
+- 已记录工具开始、但尚未进入 tool_running 时，记录 cancelled。
+- 已进入 tool_running、但没有可靠结果时，记录 unknown。
+- 已保存的核验结论引用原结果 seq，保留证据，不改写旧事件。
 
-返回接单成功前，单条 run_accepted 事件可靠保存输入原文、稳定用户消息 ID、run/turn ID、冻结模式配置。之后的 ConversationManager 消费同一输入及消息 ID，模型历史去重投影，因此“已接单但原文没保存”的窗口消除。
+`backend/context/builder.py` 负责历史投影与模型输入组装。缺失工具结果补 unknown；持久化 unknown 结果带 `[UNKNOWN]` 标记和禁止自动重试说明。cancelled、failed、rejected 等明确状态也传给模型。工具身份由 turn/request/call 共同确定，不能把 call_id 当全局 ID。
 
-SessionStore 先追加、flush、fsync，再发布事件与更新投影。同步或投影写入结果不明时冻结 writer；清理路径不能再凭旧内存序号追加。重新打开时验证实际日志位置和序号。另一个 writer 改变文件长度也会拒绝继续写入。
+有未知副作用时，执行层继续阻止后续派发。`POST /api/sessions/{sid}/operations/reconcile` 要求会话空闲、核实证据非空并确认旧进程停止；保存结论后才解除匹配的共享阻塞，不重跑工具。工具审批仍由运行时的单次 ticket 和审批事件负责。
 
-文件大输出先写完整内容、同步文件与目录，再追加 output_saved 和内容哈希。新文件、原子替换、日志尾部修复补目录同步。Windows 目录同步与严格断电语义仍依赖平台，未做实际断电试验。
+## 压缩恢复点
 
-## Checkpoint 跳过前缀
+`backend/context/compation_ckeckpoint.py` 的 `CompactionCheckpoint` 保存 context_compressed 事件：原始历史长度和摘要指纹、prepared_history、覆盖范围与估算大小。builder 校验历史前缀后复用压缩结果，并追加后续消息，系统指令每轮重新组装。核验改变了工具消息时，原前缀指纹不再匹配，旧缓存不会覆盖新证据。
 
-checkpoint 事件保留在原始 JSONL，便于历史审计；checkpoint.json 是从已提交边界产生的恢复快照，包含：
+摘要保留约束、决策、发现、下一步、相关文件、证据引用、未解决问题及已否决方案。摘要是模型生成的参考资料，不决定工具是否成功。旧六字段 prepared_history 仍可复用。
 
-- schema_version、reducer_version、session_id 和快照完整性摘要。
-- journal 的设备/inode 身份、字节偏移、边界记录长度与摘要。
-- 当前状态和 checkpoint 记录、covered_seq。
-- Context 消息与有效压缩摘要、目录授权、输出引用、当前步骤等必要运行投影。
-- 未闭合生命周期与可恢复文本片段的恢复种子。
+## 日志加速快照
 
-快照文件中的 covered_seq 包含保存状态的 checkpoint 事件本身；该事件的 covered_seq 指向其前一条事实。两者不冲突：checkpoint 事件不会额外产生工具副作用。
+本地 `journal_snapshot.json` 只保存已提交日志边界、消息和运行投影、未闭合生命周期与文本片段的恢复种子。它没有独立任务状态，也不会追加 checkpoint 事件。run_end 和 context_compressed 后自动更新缓存。
 
-启动校验有效快照后直接 seek 到偏移，只读取后续 JSONL 事件，并从快照加后缀恢复状态。完整日志不会因普通消息投影、目录授权、普通文件路径解析或新 SSE 游标而隐式加载；查看全部日志、导出与历史评测时才按需读取完整审计源。
+启动校验 schema/reducer 版本、session ID、设备/inode、字节偏移和边界记录摘要后读取后缀。缓存缺失、旧版或损坏时回放完整日志。完整损坏记录报错，仅未完成尾行可以保存诊断后修复。旧 checkpoint.json 留在磁盘但不再读取；原始消息与 context_compressed 仍可从日志恢复。
 
-完整性、版本、日志身份或边界不匹配时回退到全量日志；全量日志中的完整损坏记录会明确报错，仅保存并修复未完成尾行。旧版没有恢复快照的会话走全量恢复，随后自然生成新版快照。快照校验依赖日志前缀遵守只追加协议；它不是对旧文件每个字节重新审计，完整审计仍会验证原日志序号。
+完整审计按需读取原始日志。快照含消息投影，大小随历史增长；它只减少读取和重放轨迹的成本。
 
-快照包含模型消息投影，大小随消息历史增长。跳过的是已覆盖的原始轨迹读取与重放，不承诺整个会话按常数时间恢复，也不删除旧轨迹。
+## MySQL 与界面
 
-## Context 和中断结果
+MySQL 沿用同一事件和恢复语义，事件、会话元数据和工具操作投影通过短事务提交；mc_journal_snapshots 是独立可重建缓存。原 mc_checkpoints 不再读取，mc_sessions.state 列仅为旧表兼容保留，新会话写空对象，此后不更新、不参与恢复。数据库等待交给有界线程池，模型、Shell、文件和审批等待都在事务外。
 
-Context 从持久消息、经 source_digest 校验的 prepared_history 与后续消息重建，系统指令每轮重新组装。request_recovery 标记的废弃流只留审计，不会在重启后变成新 assistant 消息。恢复工具身份同时使用 turn/request/call，不能用供应商 call_id 当全局 ID。
+运行记录界面保留摘要历史和“执行恢复”中的未知操作核验，移除任务状态编辑与手动同步入口。`/checkpoint-state` 和 `/checkpoints/sync` 已移除。项目文件恢复仍使用独立的[文件快照](file-snapshots.md)功能。
 
-恢复只补事实，不执行工具。未完成 turn/run 被记录为 interrupted；已 tool_running 却缺结果的操作标 UNKNOWN。持久化 operation_reconciled 引用具体结果 seq，保存人工核查结论、证据、操作者以及旧进程已停止的确认。模型看到核查后的工具结果，旧未知证据继续保留。
+## 显式业务操作的持久恢复协议
 
-`POST /api/sessions/{sid}/operations/reconcile` 只在会话空闲、证据非空、确认旧进程停止时接受；过期或重复核对返回冲突。它不自动重试工具。状态人工编辑通过 `/checkpoint-state`，有 revision 检查，不能用状态标签替代操作核对。
+`backend/recovery/operations.py` 与 `tools.py` 提供本地模式的显式接入协议。运行方批准的 intent 与动作槽决定稳定 operation_id，参数首次绑定后冻结；模型调用ID、新轮次和进程重启不会生成替代业务操作。发送前先可靠保存 UNKNOWN，确认响应保存后复用结果。
 
-## 跨会话执行边界
+接入工具仍通过原生审批、tool_running、执行marker及未知会话门禁。恢复只有在旧执行者停止后才能进行：接收端声明支持稳定键则复用原键；可靠探针按 PRESENT/ABSENT/UNKNOWN 分流；无法核实则保留未知、等待用户。人工核实不能把已有持久成功凭证改为未执行。现有人工核实事件会同步回操作账本，防止两处状态分歧。
 
-本地模式采用同一用户下的全局协作式 OS 批次锁，比按单一工作目录锁更保守，因此覆盖不同应用根目录以及嵌套/重叠工作区。批次内部并发安全的读取仍可并行，外部非协作进程不受此锁控制。
+首批接入在 `others/harness/recovery_study/native_server.py`，属于独立的本地数据库、支付和模拟邮件实验组，原论文实验组保留。任意Shell、普通文件工具和Gmail未被自动推断业务身份；该账本暂不支持MySQL。显式重复操作需要新的受控意图批准，模型不能调用这一入口。数据库重复意图没有新的可靠凭证时撤销旧余额探针，不能拿第一次余额证明第二次操作已执行。
 
-副作用开始前，先写可靠 tool_running，再保存共享执行 marker，之后才进行文件/Shell 操作。结果可靠写入后清理 marker；UNKNOWN 或进程崩溃则保留它，其他协作会话不能绕过。marker 保留源 journal 和偏移；结果已提交、清理前崩溃时，可只扫描该后缀证明已知结果并清理，不重跑工具。
-
-人工核对在同一执行锁内先持久化结论及 checkpoint，再解除匹配的共享阻塞。不能因锁释放、租约过期或父进程消失就认为子进程已停止。核实过程中需要人检查真实效果和进程；系统不声称任意 Shell exactly-once 或通用自动回滚。
-
-## 前端与 MySQL
-
-执行模式行的存储按钮提供真实配置与连接检查，始终展示当前实际模式。保存配置后须重启，失败不会切换，也不回退到其他存储。
-
-MySQL 沿用本文的事件、Context、核实和恢复语义。事件与 sessions/operations/checkpoints 投影通过短事务原子提交，checkpoint 按 covered_seq 读取后缀。数据库等待交给有界线程池；LLM、Shell、文件 I/O 和审批等待都在事务外。跨模式执行域限制与旧执行者核实见 [MySQL 存储与恢复](mysql.md)。
+快照归约版本为5，保留业务意图批准事件；旧版本快照会按原协议回退日志重建。新实验恢复从快照投影读取批准链，避免为取意图额外扫描完整审计日志。实现、限制与真实崩溃证据见[本轮验收报告](research/interruption-recovery-20261023/IMPLEMENTATION-RESULTS.md)。

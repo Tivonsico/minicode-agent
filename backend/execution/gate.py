@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from backend.conversation.snapshot import identity
-from backend.conversation.store import atomic_json, sync_directory
 from backend.observability.scope import current
+from backend.storage.files import atomic_json, sync_directory
 from backend.tools.base import ToolError
 
 

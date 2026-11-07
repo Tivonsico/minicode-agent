@@ -1,0 +1,95 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 200 200"
+  width="200"
+  height="200"
+  role="img"
+  aria-labelledby="mascot-title mascot-desc"
+>
+  <title id="mascot-title">小码</title>
+  <desc id="mascot-desc">minicode 的 Q 版宠物：一只圆滚滚的小猫，胸前印着代码符号。</desc>
+  <defs>
+    <linearGradient id="mascot-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDFEFF" />
+      <stop offset="1" stop-color="#E2EAFC" />
+    </linearGradient>
+    <linearGradient id="mascot-ear" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6FAFF" />
+      <stop offset="1" stop-color="#DCE6FA" />
+    </linearGradient>
+    <radialGradient id="mascot-halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#E9F0FF" stop-opacity="0.95" />
+      <stop offset="1" stop-color="#E9F0FF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <g transform="translate(100 104) scale(1.26) translate(-100 -104)">
+    <circle cx="100" cy="110" r="84" fill="url(#mascot-halo)" />
+
+    <!-- ears -->
+    <path
+      d="M54 76 64 42c1-3 5-4 7-1l22 26Z"
+      fill="url(#mascot-ear)"
+      stroke="#A8B7D6"
+      stroke-width="2.4"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M146 76 136 42c-1-3-5-4-7-1l-22 26Z"
+      fill="url(#mascot-ear)"
+      stroke="#A8B7D6"
+      stroke-width="2.4"
+      stroke-linejoin="round"
+    />
+    <path d="M62 71 68 51l15 18Z" fill="#FFD3DC" />
+    <path d="M138 71 132 51l-15 18Z" fill="#FFD3DC" />
+
+    <!-- body -->
+    <path
+      d="M100 54c27 0 48 25 48 58 0 33-20 51-48 51s-48-18-48-51c0-33 21-58 48-58Z"
+      fill="url(#mascot-body)"
+      stroke="#A8B7D6"
+      stroke-width="2.4"
+    />
+
+    <!-- face -->
+    <ellipse cx="82" cy="101" rx="8" ry="9.4" fill="#2C303A" />
+    <ellipse cx="118" cy="101" rx="8" ry="9.4" fill="#2C303A" />
+    <circle cx="84.8" cy="97.4" r="3" fill="#FFFFFF" />
+    <circle cx="120.8" cy="97.4" r="3" fill="#FFFFFF" />
+    <circle cx="79.2" cy="105.6" r="1.6" fill="#FFFFFF" opacity="0.85" />
+    <circle cx="115.2" cy="105.6" r="1.6" fill="#FFFFFF" opacity="0.85" />
+    <ellipse cx="62" cy="114" rx="9.4" ry="5.6" fill="#FFB9C6" opacity="0.45" />
+    <ellipse cx="138" cy="114" rx="9.4" ry="5.6" fill="#FFB9C6" opacity="0.45" />
+    <path
+      d="M95 114c2.2 3.6 7.8 3.6 10 0"
+      fill="none"
+      stroke="#2C303A"
+      stroke-width="2.6"
+      stroke-linecap="round"
+    />
+
+    <!-- code mark on the chest -->
+    <g
+      fill="none"
+      stroke="#5573EE"
+      stroke-width="3.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M89 132l-9 7.5 9 7.5" />
+      <path d="M111 132l9 7.5-9 7.5" />
+      <path d="M104 128l-8 23" />
+    </g>
+
+    <!-- sparkles -->
+    <path
+      d="M156 56l2.4 5.6L164 64l-5.6 2.4L156 72l-2.4-5.6L148 64l5.6-2.4Z"
+      fill="#A9BDFF"
+    />
+    <path
+      d="M45 94l1.6 3.4L50 99l-3.4 1.6L45 104l-1.6-3.4L40 99l3.4-1.6Z"
+      fill="#C9D5F8"
+    />
+  </g>
+</svg>

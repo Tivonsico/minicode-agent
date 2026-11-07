@@ -1,0 +1,90 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 200 200"
+  width="200"
+  height="200"
+  role="img"
+  aria-labelledby="mascot-title mascot-desc"
+>
+  <title id="mascot-title">小码（笑眼）</title>
+  <desc id="mascot-desc">minicode 的 Q 版宠物：一只圆滚滚的小猫，笑起来眼睛弯成一条缝。</desc>
+  <defs>
+    <linearGradient id="mascot-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDFEFF" />
+      <stop offset="1" stop-color="#E2EAFC" />
+    </linearGradient>
+    <linearGradient id="mascot-ear" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6FAFF" />
+      <stop offset="1" stop-color="#DCE6FA" />
+    </linearGradient>
+    <radialGradient id="mascot-halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#E9F0FF" stop-opacity="0.95" />
+      <stop offset="1" stop-color="#E9F0FF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <g transform="translate(100 104) scale(1.42) translate(-100 -104)">
+    <circle cx="100" cy="110" r="58" fill="url(#mascot-halo)" />
+
+    <!-- ears -->
+    <path
+      d="M54 76 64 42c1-3 5-4 7-1l22 26Z"
+      fill="url(#mascot-ear)"
+      stroke="#A8B7D6"
+      stroke-width="2.4"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M146 76 136 42c-1-3-5-4-7-1l-22 26Z"
+      fill="url(#mascot-ear)"
+      stroke="#A8B7D6"
+      stroke-width="2.4"
+      stroke-linejoin="round"
+    />
+    <path d="M62 71 68 51l15 18Z" fill="#FFD3DC" />
+    <path d="M138 71 132 51l-15 18Z" fill="#FFD3DC" />
+
+    <!-- body -->
+    <path
+      d="M100 54c27 0 49 22 49 51 0 28-21 45-49 45s-49-17-49-45c0-29 22-51 49-51Z"
+      fill="url(#mascot-body)"
+      stroke="#A8B7D6"
+      stroke-width="2.4"
+    />
+
+    <!-- face -->
+    <path
+      d="M73.5 107c3.5-9 13.5-9 17 0"
+      fill="none"
+      stroke="#2C303A"
+      stroke-width="3.4"
+      stroke-linecap="round"
+    />
+    <path
+      d="M109.5 107c3.5-9 13.5-9 17 0"
+      fill="none"
+      stroke="#2C303A"
+      stroke-width="3.4"
+      stroke-linecap="round"
+    />
+    <ellipse cx="62" cy="115" rx="9.4" ry="5.6" fill="#FFB9C6" opacity="0.45" />
+    <ellipse cx="138" cy="115" rx="9.4" ry="5.6" fill="#FFB9C6" opacity="0.45" />
+    <path
+      d="M95 115c2.2 3.6 7.8 3.6 10 0"
+      fill="none"
+      stroke="#2C303A"
+      stroke-width="2.6"
+      stroke-linecap="round"
+    />
+
+    <!-- sparkles -->
+    <path
+      d="M156 56l2.4 5.6L164 64l-5.6 2.4L156 72l-2.4-5.6L148 64l5.6-2.4Z"
+      fill="#A9BDFF"
+    />
+    <path
+      d="M45 94l1.6 3.4L50 99l-3.4 1.6L45 104l-1.6-3.4L40 99l3.4-1.6Z"
+      fill="#C9D5F8"
+    />
+  </g>
+</svg>
